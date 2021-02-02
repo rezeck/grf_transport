@@ -1,5 +1,8 @@
 #include "grf_colletive_transport.h"
 
+/*********************************/
+/*                CONSTRUCTOR                 */
+/*********************************/
 Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
 { // constructor
     this->sensing = 0.50;
@@ -104,9 +107,13 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
     object_.global_corners = object_.local_corners;
     this->bodies_state.push_back(object_);
 }
+/*********************************/
+/*        END OF CONSTRUCTOR         */
+/*********************************/
 
-/* CALLBACK FUNCTIONS */
-
+/*********************************/
+/*        CALLBACK FUNCTIONS           */
+/*********************************/
 void Controller::gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg)
 {
     for (uint8_t i = 0; i < msg->name.size(); i++)
@@ -148,9 +155,13 @@ void Controller::r_pose_cb(const nav_msgs::OdometryConstPtr &msg, const std::str
     this->global_velocities[id].linear.x = msg->twist.twist.linear.x;
     this->global_velocities[id].linear.y = msg->twist.twist.linear.y;
 }
+/*********************************/
+/* END OF CALLBACK FUNCTIONS */
+/*********************************/
 
-/* GENERAL FUNCTION */
-
+/*********************************/
+/*          GENERAL FUNCTION             */
+/*********************************/
 std_msgs::ColorRGBA Controller::getColorByType(uint8_t type)
 {
     std_msgs::ColorRGBA color;
@@ -339,8 +350,8 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
     m.action = visualization_msgs::Marker::ADD;
     m.header.stamp = ros::Time::now();
     m.header.frame_id = "/hero_" + boost::lexical_cast<std::string>((int)r_i.id) + "/odom";
-    m.color.r = 0.0;
-    m.color.g = 0.0;
+    m.color.r = 1.0;
+    m.color.g = 1.0;
     m.color.b = 1.0;
     m.color.a = 1.0;
 #endif
@@ -353,97 +364,76 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
     double Ut = 0.0f;
     // for each obstacles point in the world (same when using a laser)
     std::vector<Vector2> objects = this->getObjectPoints(this->sensing, r_i);
-    static double coef = 1.0;
+    static double coef = 1.5;
     ros::param::get("/ut_coef", coef);
-    ROS_INFO_THROTTLE(1, "Robot %f founded object points: %d", r_i.id, (int)objects.size());
+    // ROS_INFO_THROTTLE(1, "Robot %f founded object points: %d", r_i.id, (int)objects.size());
+    Vector2 object_contour_grad(0.0, 0.0);
+    double object_mass = this->mass;
     for (int i = 0; i < objects.size(); i++)
     {
-        double dist = this->euclidean(r_i.position, objects[i]);
-        if (dist <= this->sensing)
-        {
-            Ut += 0 * this->coulombBuckinghamPotential(dist * coef, 0.04, 0.04, 0.8, 1.0, -4.0, 1.0);
-        }
-    }
-    if (objects.size() < 2)
-    {
-        return Ut;
-    }
-    Vector2 object_contour_grad(0.0, 0.0);
-    Vector2 first;
-    bool fist_ = true;
-    for (int i = 0; i < (objects.size() - 1); i++)
-    {
-        double dist = this->euclidean(objects[i], objects[i + 1]);
-        if (dist > 0.03)
+        double dist_i = this->euclidean(r_i.position, objects[i]);
+        double dist_j = this->euclidean(r_i.position, objects[(i + 1) % objects.size()]);
+        if (dist_i >= this->sensing)
         {
             continue;
         }
-        if (fist_)
+        Ut +=  this->coulombBuckinghamPotential(dist_i * coef, 0.04, 0.04, 0.8, 1.0, -16.0, 1.0);
+
+        if (dist_j >= this->sensing)
         {
-            first = objects[i];
-            fist_ = false;
+            continue;
         }
-        Vector2 obj_1 = objects[i];
-        // double theta = this->global_poses[(int)r_i.id].theta;
-        // obj_1.x = (obj_1.x - r_i.position.x) * cos(theta) - (obj_1.y - r_i.position.y) * sin(theta);
-        // obj_1.y = (obj_1.x - r_i.position.x) * sin(theta) + (obj_1.y - r_i.position.y) * cos(theta);
 
-        Vector2 obj_2 = objects[i + 1];
-        // obj_2.x = (obj_2.x - r_i.position.x) * cos(theta) - (obj_2.y - r_i.position.y) * sin(theta);
-        // obj_2.y = (obj_2.x - r_i.position.x) * sin(theta) + (obj_2.y - r_i.position.y) * cos(theta);
+        Vector2 dV;
+        dV.x = objects[(i + 1) % objects.size()].x - objects[i].x;
+        dV.y = objects[(i + 1) % objects.size()].y - objects[i].y;
 
-        Vector2 grad;
-        grad.y = obj_2.y - obj_1.y;
-        grad.x = obj_2.x - obj_1.x;
-        // grad.y = r_i.position.y*0 + size * sin (ang_);
-        // grad.x = r_i.position.x*0 + size * cos (ang_);
-        object_contour_grad.x += (grad.x - 0.0 * v.x);
-        object_contour_grad.y += (grad.y - 0.0 * v.y);
+        object_contour_grad.x += (dV.x - v.x);
+        object_contour_grad.y += (dV.y - v.y);
+        object_mass += this->mass;
 
-        m.id = i;
-        m.pose.position.x = obj_1.x;
-        m.pose.position.y = obj_1.y;
-        double yaw_ = atan2(obj_2.y - 1 * obj_1.y, obj_2.x - 1 * obj_1.x);
+#ifdef ENABLE_OBJECT_GRADIENT_RVIZ
+        double dist = this->euclidean(objects[i], objects[(i + 1) % objects.size()]);
+        m.id = 1000+i;
+        m.pose.position.x = objects[i].x;
+        m.pose.position.y = objects[i].y;
+        double yaw_ = atan2(objects[(i + 1) % objects.size()].y - 1 * objects[i].y, objects[(i + 1) % objects.size()].x - 1 * objects[i].x);
         tf::Quaternion q;
         q.setEuler(0, 0, yaw_);
         m.pose.orientation.x = q.getX();
         m.pose.orientation.y = q.getY();
         m.pose.orientation.z = q.getZ();
         m.pose.orientation.w = q.getW();
-        m.scale.x = dist +0* m.scale.x;
-        m.scale.y = 0.005;
-        m.scale.z = 0.005;
+        m.scale.x = dist;
+        m.scale.y = 0.008;
+        m.scale.z = 0.008;
         this->show_gradient_object_rviz.publish(m);
+#endif
     }
-    // m.id = (int)r_i.id;
-    // m.pose.position.x = r_i.position.x;
-    // m.pose.position.y = r_i.position.y;
-    // double yaw__ = atan2(object_contour_grad.y - 0 * first.y, object_contour_grad.x - 0 * first.x);
-    // tf::Quaternion q;
-    // q.setEuler(0, 0, yaw__);
-    // m.pose.orientation.x = q.getX();
-    // m.pose.orientation.y = q.getY();
-    // m.pose.orientation.z = q.getZ();
-    // m.pose.orientation.w = q.getW();
-    // m.scale.x = sqrt(object_contour_grad.x * object_contour_grad.x + object_contour_grad.y * object_contour_grad.y) + 1.0e-9;
-    // m.scale.y = 0.01;
-    // m.scale.z = 0.01;
-    // m.color.b = 0.5;
-    // m.color.r = 0.5;
-
-    // this->object_gradient_pub.publish(m);
-
+    // Now compute the kinetic Energy using relative velocity
     object_contour_grad = this->saturation(object_contour_grad, 1.0);
-    object_contour_grad.x += (object_contour_grad.x - v.x);
-    object_contour_grad.y += (object_contour_grad.y - v.y);
     double group_speed = (object_contour_grad.x * object_contour_grad.x + object_contour_grad.y * object_contour_grad.y) + 1.0e-9;
     double my_speed = (v.x * v.x + v.y * v.y);
     // double group_speed = sqrt(group_vrel.x*group_vrel.x + group_vrel.y*group_vrel.y) + 1.0e-9;
     // double my_speed = sqrt(v.x*v.x + v.y*v.y);
-    static double ut_mass = 5.0;
-    ros::param::get("/ut_mass", coef);
-    Ut += this->kineticEnergy(group_speed, ut_mass) + this->kineticEnergy(ut_mass, this->vmax - my_speed);
-    ROS_INFO_THROTTLE(1, "Robot %f, with Ut: %f", r_i.id, Ut);
+
+    Ut += this->kineticEnergy(group_speed, object_mass) + this->kineticEnergy(object_mass, this->vmax - my_speed);
+#ifdef ENABLE_OBJECT_GRADIENT_RVIZ1
+//     m.id = (int)r_i.id;
+//     m.pose.position.x = r_i.position.x;
+//     m.pose.position.y = r_i.position.y;
+//     double yaw__ = atan2(object_contour_grad.y, object_contour_grad.x);
+//     tf::Quaternion q;
+//     q.setEuler(0, 0, yaw__);
+//     m.pose.orientation.x = q.getX();
+//     m.pose.orientation.y = q.getY();
+//     m.pose.orientation.z = q.getZ();
+//     m.pose.orientation.w = q.getW();
+//     m.scale.x = group_speed;//sqrt(object_contour_grad.x * object_contour_grad.x + object_contour_grad.y * object_contour_grad.y) + 1.0e-9;
+//     m.scale.y = 0.01;
+//     m.scale.z = 0.01;
+//     this->show_gradient_object_rviz.publish(m);
+#endif
 
     return Ut;
 }
@@ -585,7 +575,7 @@ bool Controller::getIntersection(double r, Vector2 circle, Vector2 p1, Vector2 p
 
         o1 = this->checkSegment(o1, p1, p2);
         o2 = this->checkSegment(o2, p1, p2);
-        
+
         double dist_o1_p1 = this->euclidean(o1, p1);
         double dist_o1_p2 = this->euclidean(o1, p2);
         if (dist_o1_p2 < dist_o1_p1)
@@ -722,6 +712,39 @@ int Controller::doIntersectWithObstacle(Vector2 p1, Vector2 q1, std::vector<Vect
     return intersections;
 }
 
+bool Controller::getSegmentIntersection(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2, Vector2 &out)
+{
+    /* Does the segments intersects ? */
+    if (this->doIntersect(p1, q1, p2, q2))
+    {
+        // Line AB represented as a1x + b1y = c1
+        double a1 = q1.y - p1.y;
+        double b1 = p1.x - q1.x;
+        double c1 = a1 * (p1.x) + b1 * (p1.y);
+
+        // Line CD represented as a2x + b2y = c2
+        double a2 = q2.y - p2.y;
+        double b2 = p2.x - q2.x;
+        double c2 = a2 * (p2.x) + b2 * (p2.y);
+
+        double determinant = a1 * b2 - a2 * b1;
+
+        if (abs(determinant) < DBL_EPSILON)
+        {
+            // The lines are parallel. This is simplified
+            // by returning a pair of FLT_MAX
+            return false;
+        }
+        else
+        {
+            out.x = (b2 * c1 - b1 * c2) / determinant;
+            out.y = (a1 * c2 - a2 * c1) / determinant;
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Controller::doIntersect(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2)
 {
     // Find the four orientations needed for general and
@@ -758,73 +781,42 @@ bool Controller::doIntersect(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2)
 
 std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
 {
-    std::vector<geometry_msgs::Point> obj_pts;
-
     // Get object points
+    double laser_res = 0.2; //0.02;
+    double laser_range = sensing;
     std::vector<Vector2> object_points;
-
-    Vector2 out1, out2;
-    double res = 0.02;
-    for (uint8_t k = 0; k < this->bodies_state.size(); k++)
+    for (double step = 0; step < (M_PI * 2.0); step += laser_res)
     {
-        if (this->bodies_state[k].is_obstacle)
-        {
-            continue;
-        }
-        for (uint8_t i = 0; i < this->bodies_state[k].global_corners.size(); i++)
-        {
-            if (this->getIntersection(sensing, r.position, this->bodies_state[k].global_corners[i], this->bodies_state[k].global_corners[(i + 1) % this->bodies_state[k].global_corners.size()], out1, out2))
-            {
-                bool intersect = false;
-                for (uint8_t n = 0; n < this->bodies_state.size(); n++)
-                {
-                    if (this->doIntersectWithObstacle(r.position, out1, this->bodies_state[n].global_corners) > 1)
-                    {
-                        intersect = true;
-                        break;
-                    }
-                }
-                if (!intersect)
-                {
-                    object_points.push_back(out1);
-                }
+        Vector2 point;
+        point.x = r.position.x + laser_range * cos(step + r.theta);
+        point.y = r.position.y + laser_range * sin(step + r.theta);
 
-                double distSeg = this->euclidean(out1, out2);
-                double phi = atan2(out2.y - out1.y, out2.x - out1.x);
-                for (double step = res; step < distSeg; step += res)
+        Vector2 min_point(point.x, point.y);
+        double min_dist = laser_range;
+        for (uint8_t k = 0; k < this->bodies_state.size(); k++)
+        {
+            /* Detect only objects */
+            if (!this->bodies_state[k].is_obstacle)
+            {
+                // ROS_INFO("Founded an object %s", this->bodies_state[k].name.c_str());
+                /* For each side of polygon */
+                for (uint8_t i = 0; i < this->bodies_state[k].global_corners.size(); i++)
                 {
-                    Vector2 a;
-                    a.x = out1.x + step * cos(phi);
-                    a.y = out1.y + step * sin(phi);
-                    intersect = false;
-                    for (uint8_t n = 0; n < this->bodies_state.size(); n++)
+                    Vector2 out;
+                    if (this->getSegmentIntersection(r.position, point, this->bodies_state[k].global_corners[i], this->bodies_state[k].global_corners[(i + 1) % this->bodies_state[k].global_corners.size()], out))
                     {
-                        if (this->doIntersectWithObstacle(r.position, a, this->bodies_state[n].global_corners) > 1)
+                        double dist = this->euclidean(r.position, out);
+                        // ROS_INFO("Collision at %f with dist %f", step, dist);
+                        if (dist < min_dist)
                         {
-                            intersect = true;
-                            break;
+                            min_dist = dist;
+                            min_point = out;
                         }
                     }
-                    if (!intersect)
-                    {
-                        object_points.push_back(a);
-                    }
-                }
-                intersect = false;
-                for (uint8_t n = 0; n < this->bodies_state.size(); n++)
-                {
-                    if (this->doIntersectWithObstacle(r.position, out2, this->bodies_state[n].global_corners) > 1)
-                    {
-                        intersect = true;
-                        break;
-                    }
-                }
-                if (!intersect)
-                {
-                    object_points.push_back(out2);
                 }
             }
         }
+        object_points.push_back(min_point);
     }
 
 /* Draw points on RViz*/
@@ -853,7 +845,10 @@ std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
         geometry_msgs::Point point;
         point.x = object_points[i].x;
         point.y = object_points[i].y;
-        m.points.push_back(point);
+        if (this->euclidean(r.position, object_points[i]) < this->sensing)
+        {
+            m.points.push_back(point);
+        }
     }
     if (object_points.size())
     {
@@ -861,7 +856,7 @@ std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
     }
 #endif
 
-    // ROS_INFO_THROTTLE(1, "Getting %d point on the object", (uint8_t)object_points.size());
+    ROS_INFO_THROTTLE(1, "Getting %d point on the object", (uint8_t)object_points.size());
     return object_points;
 }
 
@@ -1079,6 +1074,7 @@ void Controller::update(long iterations)
     {
         this->states[i].position.x = this->global_poses[i].x;
         this->states[i].position.y = this->global_poses[i].y;
+        this->states[i].theta = this->global_poses[i].theta;
     }
     std::vector<Robot> states_t;
     states_t = this->states;
@@ -1150,7 +1146,7 @@ void Controller::update(long iterations)
             v.angular.z = 0.8 * err_;
         }
 
-        // this->r_cmdvel_[i].publish(v);
+        this->r_cmdvel_[i].publish(v);
     }
 
 #ifdef SHOW_TARGET_VEL_RVIZ

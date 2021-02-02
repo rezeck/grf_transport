@@ -62,6 +62,7 @@ public:
     Vector2 velocity;
     double id;
     double type;
+    double theta;
 };
 
 class Body
@@ -140,6 +141,7 @@ private:
     int orientation(Vector2 p, Vector2 q, Vector2 r);
     bool doIntersect(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2);
     int doIntersectWithObstacle(Vector2 p1, Vector2 q1, std::vector<Vector2> obstacle);
+    bool getSegmentIntersection(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2, Vector2 &out);
 
     std::vector<std::vector<Robot>> getAllRobotsNeighborns(std::vector<Robot> agents);
     Vector2 saturation(Vector2 v, double norm);
