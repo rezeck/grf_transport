@@ -1,5 +1,5 @@
 <launch>
-    <param name="robots" type="int" value="2"/>
+    <param name="robots" type="int" value="4"/>
     <param name="groups" type="int" value="1"/>
     <param name="sensing" type="double" value="0.5"/>
     <param name="worldsize" type="double" value="4.0"/>
@@ -21,6 +21,22 @@
         <arg name="y" value="-0.37321232499800305"/>
         <arg name="z" value="0.55"/>
         <arg name="id" value="1"/>
+        <arg name="type" value="0"/>
+    </include>
+
+    <include file="$(find hero_gazebo)/launch/hero_spawn.launch">
+        <arg name="x" value="-0.4416656483119535"/>
+        <arg name="y" value="1.7876672285567374"/>
+        <arg name="z" value="0.55"/>
+        <arg name="id" value="2"/>
+        <arg name="type" value="0"/>
+    </include>
+
+    <include file="$(find hero_gazebo)/launch/hero_spawn.launch">
+        <arg name="x" value="-0.3304900788004906"/>
+        <arg name="y" value="0.9788183814229688"/>
+        <arg name="z" value="0.55"/>
+        <arg name="id" value="3"/>
         <arg name="type" value="0"/>
     </include>
 

@@ -377,7 +377,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
         {
             continue;
         }
-        Ut +=  this->coulombBuckinghamPotential(dist_i * coef, 0.04, 0.04, 0.8, 1.0, -16.0, 1.0);
+        Ut += this->coulombBuckinghamPotential(dist_i * coef, 0.04, 0.04, 0.8, 1.0, -16.0, 1.0);
 
         if (dist_j >= this->sensing)
         {
@@ -394,7 +394,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
 
 #ifdef ENABLE_OBJECT_GRADIENT_RVIZ
         double dist = this->euclidean(objects[i], objects[(i + 1) % objects.size()]);
-        m.id = 1000+i;
+        m.id = 1000 + i;
         m.pose.position.x = objects[i].x;
         m.pose.position.y = objects[i].y;
         double yaw_ = atan2(objects[(i + 1) % objects.size()].y - 1 * objects[i].y, objects[(i + 1) % objects.size()].x - 1 * objects[i].x);
@@ -864,69 +864,41 @@ std::vector<Vector2> Controller::getObstaclesPoints(double sensing, Robot r)
 {
     std::vector<Vector2> obstacles;
 
-    Vector2 out1, out2;
-    double res = 0.1;
-    for (uint8_t k = 0; k < this->bodies_state.size(); k++)
+    // Get object points
+    double laser_res = 0.2;
+    double laser_range = sensing;
+    for (double step = 0; step < (M_PI * 2.0); step += laser_res)
     {
-        if (!this->bodies_state[k].is_obstacle)
-        {
-            continue;
-        }
-        for (uint8_t i = 0; i < this->bodies_state[k].global_corners.size(); i++)
-        {
-            if (this->getIntersection(sensing, r.position, this->bodies_state[k].global_corners[i], this->bodies_state[k].global_corners[(i + 1) % this->bodies_state[k].global_corners.size()], out1, out2))
-            {
-                bool intersect = false;
-                for (uint8_t n = 0; n < this->bodies_state.size(); n++)
-                {
-                    if (n != k && this->doIntersectWithObstacle(r.position, out1, this->bodies_state[n].global_corners))
-                    {
-                        intersect = true;
-                        break;
-                    }
-                }
-                if (!intersect)
-                {
-                    obstacles.push_back(out1);
-                }
+        Vector2 point;
+        point.x = r.position.x + laser_range * cos(step + r.theta);
+        point.y = r.position.y + laser_range * sin(step + r.theta);
 
-                double distSeg = this->euclidean(out1, out2);
-                double phi = atan2(out2.y - out1.y, out2.x - out1.x);
-                for (double step = res; step < distSeg; step += res)
+        Vector2 min_point(point.x, point.y);
+        double min_dist = laser_range;
+        for (uint8_t k = 0; k < this->bodies_state.size(); k++)
+        {
+            /* Detect only obstacles */
+            if (this->bodies_state[k].is_obstacle)
+            {
+                // ROS_INFO("Founded an object %s", this->bodies_state[k].name.c_str());
+                /* For each side of polygon */
+                for (uint8_t i = 0; i < this->bodies_state[k].global_corners.size(); i++)
                 {
-                    Vector2 a;
-                    a.x = out1.x + step * cos(phi);
-                    a.y = out1.y + step * sin(phi);
-                    intersect = false;
-                    for (uint8_t n = 0; n < this->bodies_state.size(); n++)
+                    Vector2 out;
+                    if (this->getSegmentIntersection(r.position, point, this->bodies_state[k].global_corners[i], this->bodies_state[k].global_corners[(i + 1) % this->bodies_state[k].global_corners.size()], out))
                     {
-                        if (n != k && this->doIntersectWithObstacle(r.position, a, this->bodies_state[n].global_corners))
+                        double dist = this->euclidean(r.position, out);
+                        // ROS_INFO("Collision at %f with dist %f", step, dist);
+                        if (dist < min_dist)
                         {
-                            intersect = true;
-                            break;
+                            min_dist = dist;
+                            min_point = out;
                         }
                     }
-                    if (!intersect)
-                    {
-                        obstacles.push_back(a);
-                    }
-                }
-                // obstacles.push_back(out2);
-                intersect = false;
-                for (uint8_t n = 0; n < this->bodies_state.size(); n++)
-                {
-                    if (n != k && this->doIntersectWithObstacle(r.position, out2, this->bodies_state[n].global_corners))
-                    {
-                        intersect = true;
-                        break;
-                    }
-                }
-                if (!intersect)
-                {
-                    obstacles.push_back(out2);
                 }
             }
         }
+        obstacles.push_back(min_point);
     }
 #ifdef SHOW_OBSTACLES_RVIZ
     visualization_msgs::Marker m;
@@ -953,8 +925,10 @@ std::vector<Vector2> Controller::getObstaclesPoints(double sensing, Robot r)
         geometry_msgs::Point point;
         point.x = obstacles[i].x;
         point.y = obstacles[i].y;
-
-        m.points.push_back(point);
+        if (this->euclidean(r.position, obstacles[i]) < this->sensing)
+        {
+            m.points.push_back(point);
+        }
     }
     if (obstacles.size())
     {

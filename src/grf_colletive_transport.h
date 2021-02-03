@@ -37,7 +37,7 @@
 #include <omp.h>
 
 #define SHOW_TARGET_VEL_RVIZ
-// #define SHOW_OBSTACLES_RVIZ
+#define SHOW_OBSTACLES_RVIZ
 #define SHOW_OBJECT_RVIZ
 #define SHOW_GRADIENT_OBJECT_RVIZ
 // #define SHOW_NEIGHBORNS_RVIZ
