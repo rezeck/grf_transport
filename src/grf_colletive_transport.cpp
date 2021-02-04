@@ -364,11 +364,15 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
     double Ut = 0.0f;
     // for each obstacles point in the world (same when using a laser)
     std::vector<Vector2> objects = this->getObjectPoints(this->sensing, r_i);
+    double factor = this->targetOcclusion(r_i, objects);
+    // ROS_INFO("Robot %f with charge %f", r_i.id, charge);
+
     static double coef = 1.5;
     ros::param::get("/ut_coef", coef);
     // ROS_INFO_THROTTLE(1, "Robot %f founded object points: %d", r_i.id, (int)objects.size());
     Vector2 object_contour_grad(0.0, 0.0);
-    double object_mass = this->mass;
+    double object_mass = 0.0 * this->mass;
+
     for (int i = 0; i < objects.size(); i++)
     {
         double dist_i = this->euclidean(r_i.position, objects[i]);
@@ -377,7 +381,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
         {
             continue;
         }
-        Ut += this->coulombBuckinghamPotential(dist_i * coef, 0.04, 0.04, 0.8, 1.0, -16.0, 1.0);
+        Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -16.0, 1.0);
 
         if (dist_j >= this->sensing)
         {
@@ -434,7 +438,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
 //     m.scale.z = 0.01;
 //     this->show_gradient_object_rviz.publish(m);
 #endif
-
+    // ROS_INFO("[%f] Object interaction potencial of %f", r_i.id, Ut);
     return Ut;
 }
 
@@ -453,9 +457,10 @@ double Controller::fof_Us(Robot r_i, Vector2 v)
     {
         // lets compute the distance to the obstacle (we only use the distance)
         double dist = this->euclidean(r_i.position, obstacles[i]);
-        // if (dist <= (this->safezone*2.0)){
-        Us += this->coulombBuckinghamPotential(dist * 0.5, 0.04, 0.04, 0.8, 1.0, 16.0, 1.0);
-        // }
+        if (dist <= 0.8*this->safezone)
+        {
+            Us += this->coulombBuckinghamPotential(dist * 0.5, 0.04, 0.04, 0.8, 1.0, 16.0, 1.0);
+        }
     }
 
     return Us;
@@ -496,7 +501,8 @@ double Controller::fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t)
             return 10000;
         }
 
-        Ust += this->coulombBuckinghamPotential(dist * 1.1, 0.04, 0.04, 0.8, 1.0, 16.0 * I, -1.0);
+        Ust += this->coulombBuckinghamPotential(dist * 1.2, 0.04, 0.04, 0.8, 1.0, 16.0 * I, -1.0);
+        // Ust += this->coulombBuckinghamPotential(dist * 1.1, 0.04, 0.04, 0.8, 1.0, 16.0 * I, -1.0);
 
         // Get the sum of the relative velocity of all my neighbor and they mass
         if (I > 0 && (dist < this->sensing) && (dist > this->safezone))
@@ -537,6 +543,62 @@ Vector2 Controller::checkSegment(Vector2 v, Vector2 v0, Vector2 v1)
     {
         return v0;
     }
+}
+
+double Controller::targetOcclusion(Robot robot, std::vector<Vector2> objects)
+{
+    Vector2 target(TARGET_X, TARGET_Y);
+    double distToTarget = this->euclidean(robot.position, target);
+    int cwise_counter = 0;
+    int ccwise_counter = 0;
+    for (uint8_t i = 0; i < objects.size(); i++)
+    {
+        double dist = this->euclidean(robot.position, objects[i]);
+        if ((dist >= this->sensing) || (distToTarget < this->euclidean(objects[i], target)))
+        {
+            continue;
+        }
+        int wise = this->orientation(robot.position, target, objects[i]);
+        if (wise == 1)
+        {
+            cwise_counter++;
+        }
+        if (wise == 2)
+        {
+            ccwise_counter++;
+        }
+        if (wise == 0)
+        {
+            cwise_counter++;
+            ccwise_counter++;
+        }
+    }
+    if ((cwise_counter == 0) || (ccwise_counter == 0))
+    {
+        return 1.5;
+    }
+    double rate = std::min(cwise_counter / (ccwise_counter + DBL_EPSILON), ccwise_counter / (cwise_counter + DBL_EPSILON)) + DBL_EPSILON;
+    if (rate > 0.4)
+    {
+        return 10.0;
+    }
+    else
+    {
+        return 2.0;
+    }
+    // double scale = cwise_counter + ccwise_counter;
+    // double k = 1.0/sqrt(scale+DBL_EPSILON) ;//0.25;
+    // double x0 = (1.0/k) * log(1.0/0.20 -1.0);
+    // double logit = (-1.0/k) * log(1.0/rate - 1.0) + x0;
+    // ROS_INFO("Report:");
+    // ROS_INFO("rate: %f", rate);
+    // ROS_INFO("scale: %f", scale);
+    // ROS_INFO("k: %f", k);
+    // ROS_INFO("x0: %f", x0);
+    // logit = std::max(std::min(logit, 1.0), 5.0);
+    // ROS_INFO("logit: %f", logit);
+
+    // return logit;
 }
 
 bool Controller::getIntersection(double r, Vector2 circle, Vector2 p1, Vector2 p2, Vector2 &o1, Vector2 &o2)
@@ -820,7 +882,6 @@ std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
     }
 
 /* Draw points on RViz*/
-#define SHOW_OBJECT_RVIZ
 #ifdef SHOW_OBJECT_RVIZ
     visualization_msgs::Marker m;
     m.type = visualization_msgs::Marker::SPHERE_LIST;
@@ -856,7 +917,7 @@ std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
     }
 #endif
 
-    ROS_INFO_THROTTLE(1, "Getting %d point on the object", (uint8_t)object_points.size());
+    // ROS_INFO_THROTTLE(1, "Getting %d point on the object", (uint8_t)object_points.size());
     return object_points;
 }
 

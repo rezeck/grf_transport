@@ -36,9 +36,12 @@
 
 #include <omp.h>
 
+#define TARGET_X 1.1639
+#define TARGET_Y 1.6854
+
 #define SHOW_TARGET_VEL_RVIZ
-#define SHOW_OBSTACLES_RVIZ
-#define SHOW_OBJECT_RVIZ
+// #define SHOW_OBSTACLES_RVIZ
+// #define SHOW_OBJECT_RVIZ
 #define SHOW_GRADIENT_OBJECT_RVIZ
 // #define SHOW_NEIGHBORNS_RVIZ
 
@@ -142,6 +145,8 @@ private:
     bool doIntersect(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2);
     int doIntersectWithObstacle(Vector2 p1, Vector2 q1, std::vector<Vector2> obstacle);
     bool getSegmentIntersection(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2, Vector2 &out);
+
+    double targetOcclusion(Robot robot,  std::vector<Vector2> objects);
 
     std::vector<std::vector<Robot>> getAllRobotsNeighborns(std::vector<Robot> agents);
     Vector2 saturation(Vector2 v, double norm);
