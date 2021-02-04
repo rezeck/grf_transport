@@ -39,13 +39,6 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
         // this->color_service[i].waitForExistence()
         int type_ = 0;
         ros::param::get(robot_name + "/type", type_);
-        std_msgs::ColorRGBA color = this->getColorByType((uint8_t)type_);
-        gazebo_msgs::SetLightProperties gz_color;
-        gz_color.request.diffuse.a = color.a / 255.0;
-        gz_color.request.diffuse.r = color.r / 255.0;
-        gz_color.request.diffuse.g = color.g / 255.0;
-        gz_color.request.diffuse.b = color.b / 255.0;
-        this->color_service[i].call(gz_color);
         geometry_msgs::Pose2D p;
         geometry_msgs::Twist t;
         this->global_velocities.push_back(t);
@@ -60,6 +53,7 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
         r.id = (double)i;
         ROS_INFO("Type: %f", r.type);
         this->states.push_back(r);
+        this->setRobotColor(r, (int)r.type);
     }
 
     this->gz_model_poses_ = nh_.subscribe<gazebo_msgs::ModelStates>("/gazebo/model_states", 1, &Controller::gz_poses_cb, this);
@@ -135,6 +129,19 @@ void Controller::gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg)
                     corner.y = this->bodies_state[j].cm_position.y + (this->bodies_state[j].local_corners[k].x) * sin(this->bodies_state[j].yaw) + (this->bodies_state[j].local_corners[k].y) * cos(this->bodies_state[j].yaw);
                     this->bodies_state[j].global_corners[k] = corner;
                 }
+                if (strcmp(msg->name[i].c_str(), "cardboard_box") == 0)
+                {
+                    Vector2 target(TARGET_X, TARGET_Y);
+                    double dist = this->euclidean(this->bodies_state[j].cm_position, target);
+                    if (dist < 0.1)
+                    {
+                        this->bodies_state[j].is_obstacle = true;
+                    }
+                    else
+                    {
+                        this->bodies_state[j].is_obstacle = false;
+                    }
+                }
             }
         }
     }
@@ -162,6 +169,17 @@ void Controller::r_pose_cb(const nav_msgs::OdometryConstPtr &msg, const std::str
 /*********************************/
 /*          GENERAL FUNCTION             */
 /*********************************/
+void Controller::setRobotColor(Robot robot, int colorId)
+{
+    std_msgs::ColorRGBA color = this->getColorByType(colorId);
+    gazebo_msgs::SetLightProperties gz_color;
+    gz_color.request.diffuse.a = color.a / 255.0;
+    gz_color.request.diffuse.r = color.r / 255.0;
+    gz_color.request.diffuse.g = color.g / 255.0;
+    gz_color.request.diffuse.b = color.b / 255.0;
+    this->color_service[(int)robot.id].call(gz_color);
+}
+
 std_msgs::ColorRGBA Controller::getColorByType(uint8_t type)
 {
     std_msgs::ColorRGBA color;
@@ -169,19 +187,19 @@ std_msgs::ColorRGBA Controller::getColorByType(uint8_t type)
     switch (type)
     { // BGR
     case 0:
+        color.r = 0;
+        color.g = 128;
+        color.b = 245;
+        break; // maroon
+    case 1:
+        color.r = 250;
+        color.g = 250;
+        color.b = 0;
+        break; // dark slate gray
+    case 2:
         color.r = 128;
         color.g = 0;
         color.b = 0;
-        break; // maroon
-    case 1:
-        color.r = 47;
-        color.g = 79;
-        color.b = 79;
-        break; // dark slate gray
-    case 2:
-        color.r = 138;
-        color.g = 43;
-        color.b = 226;
         break; // blue violet
     case 3:
         color.r = 199;
@@ -381,7 +399,15 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
         {
             continue;
         }
-        Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -16.0, 1.0);
+        if (factor >= 5)
+        {
+            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -80.0, 1.0);
+            return Ut;
+        }
+        else
+        {
+            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -32.0, 1.0);
+        }
 
         if (dist_j >= this->sensing)
         {
@@ -394,7 +420,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
 
         object_contour_grad.x += (dV.x - v.x);
         object_contour_grad.y += (dV.y - v.y);
-        object_mass += this->mass;
+        object_mass += 1.4 * this->mass;
 
 #ifdef ENABLE_OBJECT_GRADIENT_RVIZ
         double dist = this->euclidean(objects[i], objects[(i + 1) % objects.size()]);
@@ -457,7 +483,7 @@ double Controller::fof_Us(Robot r_i, Vector2 v)
     {
         // lets compute the distance to the obstacle (we only use the distance)
         double dist = this->euclidean(r_i.position, obstacles[i]);
-        if (dist <= 0.8*this->safezone)
+        if (dist <= 0.9 * this->safezone)
         {
             Us += this->coulombBuckinghamPotential(dist * 0.5, 0.04, 0.04, 0.8, 1.0, 16.0, 1.0);
         }
@@ -501,8 +527,7 @@ double Controller::fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t)
             return 10000;
         }
 
-        Ust += this->coulombBuckinghamPotential(dist * 1.2, 0.04, 0.04, 0.8, 1.0, 16.0 * I, -1.0);
-        // Ust += this->coulombBuckinghamPotential(dist * 1.1, 0.04, 0.04, 0.8, 1.0, 16.0 * I, -1.0);
+        Ust += this->coulombBuckinghamPotential(dist * 1.1, 0.04, 0.04, 0.8, 1.0, 16.0 * I, -1.0);
 
         // Get the sum of the relative velocity of all my neighbor and they mass
         if (I > 0 && (dist < this->sensing) && (dist > this->safezone))
@@ -578,13 +603,13 @@ double Controller::targetOcclusion(Robot robot, std::vector<Vector2> objects)
         return 1.5;
     }
     double rate = std::min(cwise_counter / (ccwise_counter + DBL_EPSILON), ccwise_counter / (cwise_counter + DBL_EPSILON)) + DBL_EPSILON;
-    if (rate > 0.4)
+    if (rate > 0.2)
     {
-        return 10.0;
+        return 5.0;
     }
     else
     {
-        return 2.0;
+        return 3.0;
     }
     // double scale = cwise_counter + ccwise_counter;
     // double k = 1.0/sqrt(scale+DBL_EPSILON) ;//0.25;
@@ -844,7 +869,7 @@ bool Controller::doIntersect(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2)
 std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
 {
     // Get object points
-    double laser_res = 0.2; //0.02;
+    double laser_res = LASER_RESOLUTION; //0.02;
     double laser_range = sensing;
     std::vector<Vector2> object_points;
     for (double step = 0; step < (M_PI * 2.0); step += laser_res)
@@ -1157,7 +1182,22 @@ void Controller::update(long iterations)
         m.scale.x = sqrt(this->states[i].velocity.y * this->states[i].velocity.y + this->states[i].velocity.x * this->states[i].velocity.x);
         m_array.markers.push_back(m);
 #endif
-
+        std::vector<Vector2> objects = this->getObjectPoints(this->sensing, this->states[i]);
+        int state_color = 0;
+        for (uint8_t k = 0; k < objects.size(); k++)
+        {
+            double mdist = this->euclidean(objects[k], this->states[i].position);
+            if ((state_color == 0) && (mdist < this->sensing))
+            {
+                state_color = 1;
+            }
+            if ((state_color == 1) && (mdist < 0.05))
+            {
+                state_color = 2;
+                break;
+            }
+        }
+        this->setRobotColor(this->states[i], state_color);
         // Holonomic to differential driver controller
         geometry_msgs::Twist v;
         // double theta_ = atan2(this->states[i].position.y - this->global_poses[i].y, this->states[i].position.x - this->global_poses[i].x);

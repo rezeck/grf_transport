@@ -49,6 +49,8 @@
 #define OBJECT_SX 1.259320
 #define OBJECT_SY 1.007450
 
+#define LASER_RESOLUTION 0.2
+
 class Vector2
 {
 public:
@@ -112,6 +114,7 @@ private:
     ros::NodeHandle nh_; // ROS Node Handle
 
     std_msgs::ColorRGBA getColorByType(uint8_t type);
+    void setRobotColor(Robot robot, int colorId);
 
     std::vector<ros::Publisher> r_cmdvel_;
     void r_pose_cb(const nav_msgs::OdometryConstPtr &msg, const std::string &topic, const int &id);
