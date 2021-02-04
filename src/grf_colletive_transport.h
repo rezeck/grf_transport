@@ -36,8 +36,8 @@
 
 #include <omp.h>
 
-#define TARGET_X 1.1639
-#define TARGET_Y 1.6854
+// #define TARGET_X 1.1639
+// #define TARGET_Y 1.6854
 
 #define SHOW_TARGET_VEL_RVIZ
 // #define SHOW_OBSTACLES_RVIZ
@@ -68,6 +68,7 @@ public:
     double id;
     double type;
     double theta;
+    int state;
 };
 
 class Body
@@ -106,6 +107,7 @@ public:
 
     std::vector<Robot> states;
     std::vector<Body> bodies_state;
+    Vector2 target;
     boost::mutex mutex;
 
     void update(long iterations);

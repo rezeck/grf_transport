@@ -112,6 +112,12 @@ void Controller::gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg)
 {
     for (uint8_t i = 0; i < msg->name.size(); i++)
     {
+        if (strcmp(msg->name[i].c_str(), "cardboard_box_target") == 0)
+        {
+            this->target.x = msg->pose[i].position.x;
+            this->target.y = msg->pose[i].position.y;
+            continue;
+        }
         for (uint8_t j = 0; j < this->bodies_state.size(); j++)
         {
             if (strcmp(msg->name[i].c_str(), this->bodies_state[j].name.c_str()) == 0)
@@ -131,8 +137,7 @@ void Controller::gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg)
                 }
                 if (strcmp(msg->name[i].c_str(), "cardboard_box") == 0)
                 {
-                    Vector2 target(TARGET_X, TARGET_Y);
-                    double dist = this->euclidean(this->bodies_state[j].cm_position, target);
+                    double dist = this->euclidean(this->bodies_state[j].cm_position, this->target);
                     if (dist < 0.1)
                     {
                         this->bodies_state[j].is_obstacle = true;
@@ -572,18 +577,17 @@ Vector2 Controller::checkSegment(Vector2 v, Vector2 v0, Vector2 v1)
 
 double Controller::targetOcclusion(Robot robot, std::vector<Vector2> objects)
 {
-    Vector2 target(TARGET_X, TARGET_Y);
-    double distToTarget = this->euclidean(robot.position, target);
+    double distToTarget = this->euclidean(robot.position, this->target);
     int cwise_counter = 0;
     int ccwise_counter = 0;
     for (uint8_t i = 0; i < objects.size(); i++)
     {
         double dist = this->euclidean(robot.position, objects[i]);
-        if ((dist >= this->sensing) || (distToTarget < this->euclidean(objects[i], target)))
+        if ((dist >= this->sensing) || (distToTarget < this->euclidean(objects[i], this->target)))
         {
             continue;
         }
-        int wise = this->orientation(robot.position, target, objects[i]);
+        int wise = this->orientation(robot.position, this->target, objects[i]);
         if (wise == 1)
         {
             cwise_counter++;
@@ -1197,7 +1201,11 @@ void Controller::update(long iterations)
                 break;
             }
         }
-        this->setRobotColor(this->states[i], state_color);
+        if (this->states[i].state != state_color)
+        {
+            this->states[i].state == state_color;
+            this->setRobotColor(this->states[i], state_color);
+        }
         // Holonomic to differential driver controller
         geometry_msgs::Twist v;
         // double theta_ = atan2(this->states[i].position.y - this->global_poses[i].y, this->states[i].position.x - this->global_poses[i].x);
