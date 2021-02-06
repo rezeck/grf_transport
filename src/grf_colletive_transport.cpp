@@ -1195,7 +1195,7 @@ void Controller::update(long iterations)
             {
                 state_color = 1;
             }
-            if ((state_color == 1) && (mdist < 0.05))
+            if ((state_color == 1) && (mdist < 0.04))
             {
                 state_color = 2;
                 break;
