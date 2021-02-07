@@ -57,7 +57,6 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
     }
 
     this->gz_model_poses_ = nh_.subscribe<gazebo_msgs::ModelStates>("/gazebo/model_states", 1, &Controller::gz_poses_cb, this);
-    this->object_gradient_pub = nh_.advertise<visualization_msgs::Marker>("object_gradient", 1);
 
 #ifdef SHOW_GRADIENT_OBJECT_RVIZ
     this->show_gradient_object_rviz = nh_.advertise<visualization_msgs::Marker>("/show_gradient_object_rviz", 1);
@@ -198,7 +197,7 @@ std_msgs::ColorRGBA Controller::getColorByType(uint8_t type)
         break; // maroon
     case 1:
         color.r = 250;
-        color.g = 250;
+        color.g = 240;
         color.b = 0;
         break; // dark slate gray
     case 2:
@@ -364,8 +363,7 @@ double Controller::coulombBuckinghamPotential(double r, double eplson, double ep
 double Controller::fof_Ut(Robot r_i, Vector2 v)
 {
 
-#define ENABLE_OBJECT_GRADIENT_RVIZ
-#ifdef ENABLE_OBJECT_GRADIENT_RVIZ
+#ifdef SHOW_GRADIENT_OBJECT_RVIZ
     visualization_msgs::Marker m;
     m.type = visualization_msgs::Marker::ARROW;
     m.action = visualization_msgs::Marker::DELETEALL;
@@ -380,6 +378,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
 #endif
 
     // Simulated (kinematic model of the robot) the motion of the robot using the sampled velocity
+    // ROS_INFO("(%f, %f) -> (%f, %f)", r_i.position.x, r_i.position.y, r_i.position.x+v.x*this->dt, r_i.position.y+v.y*this->dt);
     r_i.position.x = r_i.position.x + v.x * this->dt;
     r_i.position.y = r_i.position.y + v.y * this->dt;
 
@@ -388,6 +387,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
     // for each obstacles point in the world (same when using a laser)
     std::vector<Vector2> objects = this->getObjectPoints(this->sensing, r_i);
     double factor = this->targetOcclusion(r_i, objects);
+    bool use_cwise = this->goCWise(r_i, objects);
     // ROS_INFO("Robot %f with charge %f", r_i.id, charge);
 
     static double coef = 1.5;
@@ -404,9 +404,10 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
         {
             continue;
         }
+        // Ut += this->coulombBuckinghamPotential(dist_i * 1.5, 0.04, 0.04, 0.8, 1.0, -32.0, 1.0);
         if (factor >= 5)
         {
-            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -80.0, 1.0);
+            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -800000.0, 1.0);
             return Ut;
         }
         else
@@ -420,19 +421,27 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
         }
 
         Vector2 dV;
-        dV.x = objects[(i + 1) % objects.size()].x - objects[i].x;
-        dV.y = objects[(i + 1) % objects.size()].y - objects[i].y;
+        if (use_cwise)
+        {
+            dV.x = objects[(i + 1) % objects.size()].x - objects[i].x;
+            dV.y = objects[(i + 1) % objects.size()].y - objects[i].y;
+        }
+        else
+        {
+            dV.x = objects[i].x - objects[(i + 1) % objects.size()].x;
+            dV.y = objects[i].y - objects[(i + 1) % objects.size()].y;
+        }
 
         object_contour_grad.x += (dV.x - v.x);
         object_contour_grad.y += (dV.y - v.y);
-        object_mass += 1.4 * this->mass;
+        object_mass += 3.8 * this->mass;
 
-#ifdef ENABLE_OBJECT_GRADIENT_RVIZ
+#ifdef SHOW_GRADIENT_OBJECT_RVIZ
         double dist = this->euclidean(objects[i], objects[(i + 1) % objects.size()]);
         m.id = 1000 + i;
         m.pose.position.x = objects[i].x;
         m.pose.position.y = objects[i].y;
-        double yaw_ = atan2(objects[(i + 1) % objects.size()].y - 1 * objects[i].y, objects[(i + 1) % objects.size()].x - 1 * objects[i].x);
+        double yaw_ = atan2(dV.y, dV.x);
         tf::Quaternion q;
         q.setEuler(0, 0, yaw_);
         m.pose.orientation.x = q.getX();
@@ -453,7 +462,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
     // double my_speed = sqrt(v.x*v.x + v.y*v.y);
 
     Ut += this->kineticEnergy(group_speed, object_mass) + this->kineticEnergy(object_mass, this->vmax - my_speed);
-#ifdef ENABLE_OBJECT_GRADIENT_RVIZ1
+#ifdef SHOW_GRADIENT_OBJECT_RVIZ1
 //     m.id = (int)r_i.id;
 //     m.pose.position.x = r_i.position.x;
 //     m.pose.position.y = r_i.position.y;
@@ -604,16 +613,16 @@ double Controller::targetOcclusion(Robot robot, std::vector<Vector2> objects)
     }
     if ((cwise_counter == 0) || (ccwise_counter == 0))
     {
-        return 1.5;
+        return 1.2;
     }
     double rate = std::min(cwise_counter / (ccwise_counter + DBL_EPSILON), ccwise_counter / (cwise_counter + DBL_EPSILON)) + DBL_EPSILON;
-    if (rate > 0.2)
+    if (rate > 0.5)
     {
         return 5.0;
     }
     else
     {
-        return 3.0;
+        return 1.2;
     }
     // double scale = cwise_counter + ccwise_counter;
     // double k = 1.0/sqrt(scale+DBL_EPSILON) ;//0.25;
@@ -628,6 +637,42 @@ double Controller::targetOcclusion(Robot robot, std::vector<Vector2> objects)
     // ROS_INFO("logit: %f", logit);
 
     // return logit;
+}
+
+bool Controller::goCWise(Robot robot, std::vector<Vector2> objects)
+{
+    Vector2 goal;
+    goal.x = robot.position.x + cos(robot.theta) * this->sensing * 0.5;
+    goal.y = robot.position.y + sin(robot.theta) * this->sensing * 0.5;
+    double distToTarget = this->euclidean(robot.position, goal);
+    int cwise_counter = 0;
+    int ccwise_counter = 0;
+    int points = 0;
+    for (uint8_t i = 0; i < objects.size(); i++)
+    {
+        double dist = this->euclidean(robot.position, objects[i]);
+        if ((dist >= this->sensing))// || (distToTarget < this->euclidean(objects[i], goal)))
+        {
+            continue;
+        }
+        points++;
+        int wise = this->orientation(robot.position, goal, objects[i]);
+        if (wise == 1)
+        {
+            cwise_counter++;
+        }
+        if (wise == 2)
+        {
+            ccwise_counter++;
+        }
+        if (wise == 0)
+        {
+            cwise_counter++;
+            ccwise_counter++;
+        }
+    }
+    // ROS_INFO("(%d, %d) = %d/%d", ccwise_counter, cwise_counter, points, (int)objects.size());
+    return (cwise_counter >= ccwise_counter);
 }
 
 bool Controller::getIntersection(double r, Vector2 circle, Vector2 p1, Vector2 p2, Vector2 &o1, Vector2 &o2)
@@ -1195,7 +1240,7 @@ void Controller::update(long iterations)
             {
                 state_color = 1;
             }
-            if ((state_color == 1) && (mdist < 0.04))
+            if ((state_color == 1) && (mdist < 0.06))
             {
                 state_color = 2;
                 break;
@@ -1254,7 +1299,11 @@ int main(int argc, char **argv)
     uint64_t iterations = 0;
     while (ros::ok())
     {
+        auto t1 = std::chrono::high_resolution_clock::now();
         control.update(0);
+        auto t2 = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
+        ROS_INFO_THROTTLE(1, "Loop-time at %f ms", (float) duration * 0.001);
         iterations++;
         ros::spinOnce();
         rate.sleep();

@@ -42,7 +42,7 @@
 #define SHOW_TARGET_VEL_RVIZ
 // #define SHOW_OBSTACLES_RVIZ
 // #define SHOW_OBJECT_RVIZ
-#define SHOW_GRADIENT_OBJECT_RVIZ
+// #define SHOW_GRADIENT_OBJECT_RVIZ
 // #define SHOW_NEIGHBORNS_RVIZ
 
 #define OBJECT_SIZE 0.39704 // (cm)
@@ -83,7 +83,6 @@ public:
     bool is_obstacle = false;
 };
 
-
 class Controller
 {
 public:
@@ -113,27 +112,31 @@ public:
     void update(long iterations);
 
 private:
-    ros::NodeHandle nh_; // ROS Node Handle
+    /* ROS Node Handle */
+    ros::NodeHandle nh_;
 
-    std_msgs::ColorRGBA getColorByType(uint8_t type);
-    void setRobotColor(Robot robot, int colorId);
-
+    /* Topics and Services */
     std::vector<ros::Publisher> r_cmdvel_;
-    void r_pose_cb(const nav_msgs::OdometryConstPtr &msg, const std::string &topic, const int &id);
     std::vector<ros::Subscriber> r_pose_;
-    std::vector<geometry_msgs::Pose2D> global_poses;
-    std::vector<geometry_msgs::Twist> global_velocities;
-    std::vector<ros::ServiceClient> color_service;
     ros::Subscriber gz_model_poses_;
-    void gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg);
-    ros::Publisher object_points_pub;
-    ros::Publisher object_gradient_pub;
+    std::vector<ros::ServiceClient> color_service;
 
+    /* Topics Callbacks */
+    void r_pose_cb(const nav_msgs::OdometryConstPtr &msg, const std::string &topic, const int &id);
+    void gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg);
+
+    /* RViz debug topics */
     ros::Publisher show_target_vel_rviz;
     ros::Publisher show_neighborns_rviz;
     ros::Publisher show_obstacles_rviz;
     ros::Publisher show_objects_rviz;
     ros::Publisher show_gradient_object_rviz;
+
+    std_msgs::ColorRGBA getColorByType(uint8_t type);
+    void setRobotColor(Robot robot, int colorId);
+
+    std::vector<geometry_msgs::Pose2D> global_poses;
+    std::vector<geometry_msgs::Twist> global_velocities;
 
     double kineticEnergy(double v, double m);
     double coulombBuckinghamPotential(double r, double eplson, double eplson0, double r0, double alpha, double q1, double q2);
@@ -151,7 +154,8 @@ private:
     int doIntersectWithObstacle(Vector2 p1, Vector2 q1, std::vector<Vector2> obstacle);
     bool getSegmentIntersection(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2, Vector2 &out);
 
-    double targetOcclusion(Robot robot,  std::vector<Vector2> objects);
+    double targetOcclusion(Robot robot, std::vector<Vector2> objects);
+    bool goCWise(Robot robot, std::vector<Vector2> objects);
 
     std::vector<std::vector<Robot>> getAllRobotsNeighborns(std::vector<Robot> agents);
     Vector2 saturation(Vector2 v, double norm);

@@ -5,8 +5,8 @@
 - [] Check targetOcclusion function
     - [] Robot position preditor?
     - [] Define logit function to feed potentials parameters
-
+- [] Improve loop-performance
 - [ ] Add robot-dead feature
 - [ ] How heterogeneity will work?
 - [x] Target by using gazebo to move the target_box
-- [ ] Current gradient is not suitable (need other strategy)
+- [x] Current gradient is not suitable (need other strategy)
