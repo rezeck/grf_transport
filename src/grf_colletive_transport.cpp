@@ -25,38 +25,48 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
 
     for (int i = 0; i < this->robots; i++)
     {
-        // Topics name
+        /* Topics name */
         std::string robot_name = "/hero_" + boost::lexical_cast<std::string>(i);
         ROS_INFO("Starting robot: %s", robot_name.c_str());
         std::string cmd_topic = robot_name + "/cmd_vel";
         std::string pose_topic = robot_name + "/odom";
         std::string target_topic = robot_name + "/target";
         std::string color_topic = robot_name + "/hat_color";
-        // Topics
+        /* Topics */
         this->r_cmdvel_.push_back(nh_.advertise<geometry_msgs::Twist>(cmd_topic.c_str(), 1));
         this->r_pose_.push_back(nh_.subscribe<nav_msgs::Odometry>(pose_topic.c_str(), 1, boost::bind(&Controller::r_pose_cb, this, _1, pose_topic, i)));
-        this->color_service.push_back(nh_.serviceClient<gazebo_msgs::SetLightProperties>(color_topic.c_str()));
-        // this->color_service[i].waitForExistence()
+        this->r_cmdcolor_.push_back(nh_.advertise<std_msgs::ColorRGBA>(color_topic.c_str(), 1));
+        /* Get robot type */
         int type_ = 0;
         ros::param::get(robot_name + "/type", type_);
+        /* Instatiate robot global states */
         geometry_msgs::Pose2D p;
         geometry_msgs::Twist t;
         this->global_velocities.push_back(t);
         this->global_poses.push_back(p);
 
-        // Get initial state of the robots
+        /* Get initial state of the robots */
         Robot r;
-        // Get initial velocities
+        /* Get initial velocities */
         r.velocity.x = this->vmax;
         r.velocity.y = this->vmax;
         r.type = type_;
         r.id = (double)i;
+        r.is_dead = false;
         ROS_INFO("Type: %f", r.type);
         this->states.push_back(r);
+        /* Set robot color by type */
         this->setRobotColor(r, (int)r.type);
     }
 
+#ifdef PUBLISH_OBJECT_STATE
+    this->publish_object_state = nh_.advertise<geometry_msgs::Vector3>("/object_state", 1);
+#endif
+
     this->gz_model_poses_ = nh_.subscribe<gazebo_msgs::ModelStates>("/gazebo/model_states", 1, &Controller::gz_poses_cb, this);
+    // #ifdef EXPERIMENT_MODE
+    this->publish_goal_state = nh_.advertise<gazebo_msgs::ModelState>("/gazebo/set_model_state", 1);
+    // #endif
 
 #ifdef SHOW_GRADIENT_OBJECT_RVIZ
     this->show_gradient_object_rviz = nh_.advertise<visualization_msgs::Marker>("/show_gradient_object_rviz", 1);
@@ -83,22 +93,102 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
     obstacle_.local_corners.push_back(Vector2(this->worldsize * 0.5, -this->worldsize * 0.5));
     obstacle_.local_corners.push_back(Vector2(this->worldsize * 0.5, this->worldsize * 0.5));
     obstacle_.local_corners.push_back(Vector2(-this->worldsize * 0.5, this->worldsize * 0.5));
+    // Complex environment
+    // obstacle_.local_corners.push_back(Vector2(1.75, -1.95));
+    // obstacle_.local_corners.push_back(Vector2(0.675, -1.95));
+    // obstacle_.local_corners.push_back(Vector2(0.675, 0));
+    // obstacle_.local_corners.push_back(Vector2(0.625, 0));
+    // obstacle_.local_corners.push_back(Vector2(0.625, -1.95));
+    // obstacle_.local_corners.push_back(Vector2(-1.75, -1.95));
+    // obstacle_.local_corners.push_back(Vector2(-1.95, -1.75));
+    // obstacle_.local_corners.push_back(Vector2(-1.95, 1.75));
+    // obstacle_.local_corners.push_back(Vector2(-1.75, 1.95));
+    // obstacle_.local_corners.push_back(Vector2(-0.675, 1.95));
+    // obstacle_.local_corners.push_back(Vector2(-0.675, 0));
+    // obstacle_.local_corners.push_back(Vector2(-0.625, 0));
+    // obstacle_.local_corners.push_back(Vector2(-0.625, 1.95));
+    // obstacle_.local_corners.push_back(Vector2(1.75, 1.95));
+    // obstacle_.local_corners.push_back(Vector2(1.95, 1.75));
+    // obstacle_.local_corners.push_back(Vector2(1.95, -1.75));
     obstacle_.global_corners = obstacle_.local_corners;
     this->bodies_state.push_back(obstacle_);
 
     // Object body lo cal state
-    double dx = OBJECT_SIZE * OBJECT_SX / 2.0;
-    double dy = OBJECT_SIZE * OBJECT_SY / 2.0;
+    // #define USING_CARDBOARD
     Body object_;
-    object_.cm_position = Vector2(0.0, 0.0);
+    object_.cm_position = Vector2(100.0, -100.0);
     object_.is_obstacle = false;
-    object_.name = "cardboard_box";
-    object_.local_corners.push_back(Vector2(-dx, -dy));
-    object_.local_corners.push_back(Vector2(dx, -dy));
-    object_.local_corners.push_back(Vector2(dx, dy));
-    object_.local_corners.push_back(Vector2(-dx, dy));
+    object_.name = TARGET_OBJECT;
+    if (TARGET_OBJECT == RECTANGLE_PRISM)
+    {
+        object_.local_corners.push_back(Vector2(-0.19852 * OBJECT_SX, -0.19852 * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(0.19852 * OBJECT_SX, -0.19852 * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(0.19852 * OBJECT_SX, 0.19852 * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(-0.19852 * OBJECT_SX, 0.19852 * OBJECT_SY));
+    }
+    else if (TARGET_OBJECT == TRIANGLE_PRIM)
+    {
+        double dx = 0.16, dy = 0.27713;
+        object_.local_corners.push_back(Vector2(-dx * OBJECT_SX, -dy * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(-dx * OBJECT_SX, dy * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(0.32 * OBJECT_SX, 0.0 * OBJECT_SY));
+    }
+    else if (TARGET_OBJECT == POLY_PRISM)
+    {
+        double dx = 0.3, dy = 0.12426398;
+        object_.local_corners.push_back(Vector2(dx * OBJECT_SX, -dy * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(dy * OBJECT_SX, -dx * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(-dy * OBJECT_SX, -dx * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(-dx * OBJECT_SX, -dy * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(-dx * OBJECT_SX, dy * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(-dy * OBJECT_SX, dx * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(dy * OBJECT_SX, dx * OBJECT_SY));
+        object_.local_corners.push_back(Vector2(dx * OBJECT_SX, dy * OBJECT_SY));
+    }
     object_.global_corners = object_.local_corners;
     this->bodies_state.push_back(object_);
+    // object_.name = TARGET_OBJECT "_goal";
+    // object_.is_obstacle = true;
+    // this->bodies_state.push_back(object_);
+
+    // gazebo_msgs::ModelState new_goal;
+    // new_goal.model_name = TARGET_OBJECT ;
+    // new_goal.pose.position.z = 0.150000;
+    // new_goal.pose.position.x = OBJECT_POS_X;
+    // new_goal.pose.position.x = OBJECT_POS_Y;
+    // this->publish_goal_state.publish(new_goal);
+    // ros::spinOnce();
+
+    this->targets_name.push_back("rectangle_prism_goal");
+    this->targets_id = 0;
+    object_.name = "rectangle_prism_goal";
+    object_.is_obstacle = true;
+    this->bodies_state.push_back(object_);
+
+    // this->targets_name.push_back("rectangle_prism_goal_0");
+    // this->targets_name.push_back("rectangle_prism_goal_1");
+    // this->targets_name.push_back("rectangle_prism_goal_2");
+    // this->targets_name.push_back("rectangle_prism_goal_3");
+    // this->targets_name.push_back("rectangle_prism_goal_4");
+    // this->targets_id = 0;
+    // object_.name = "rectangle_prism_goal_0";
+    // object_.is_obstacle = true;
+    // this->bodies_state.push_back(object_);
+    // object_.name = "rectangle_prism_goal_1";
+    // object_.is_obstacle = false;
+    // this->bodies_state.push_back(object_);
+    // object_.name = "rectangle_prism_goal_2";
+    // object_.is_obstacle = false;
+    // this->bodies_state.push_back(object_);
+    // object_.name = "rectangle_prism_goal_3";
+    // object_.is_obstacle = false;
+    // this->bodies_state.push_back(object_);
+    // object_.name = "rectangle_prism_goal_4";
+    // object_.is_obstacle = false;
+    // this->bodies_state.push_back(object_);
+
+    this->target.x = 200;
+    this->target.y = 200;
 }
 /*********************************/
 /*        END OF CONSTRUCTOR         */
@@ -111,11 +201,12 @@ void Controller::gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg)
 {
     for (uint8_t i = 0; i < msg->name.size(); i++)
     {
-        if (strcmp(msg->name[i].c_str(), "cardboard_box_target") == 0)
+        ROS_INFO_THROTTLE(1, "\33[92mCurrent target (%f, %f) - Id: %d\33[0m", this->target.x, this->target.y, this->targets_id);
+        // if (strcmp(msg->name[i].c_str(), TARGET_OBJECT "_goal") == 0)
+        if (strcmp(msg->name[i].c_str(), this->targets_name[this->targets_id].c_str()) == 0)
         {
             this->target.x = msg->pose[i].position.x;
             this->target.y = msg->pose[i].position.y;
-            continue;
         }
         for (uint8_t j = 0; j < this->bodies_state.size(); j++)
         {
@@ -134,16 +225,54 @@ void Controller::gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg)
                     corner.y = this->bodies_state[j].cm_position.y + (this->bodies_state[j].local_corners[k].x) * sin(this->bodies_state[j].yaw) + (this->bodies_state[j].local_corners[k].y) * cos(this->bodies_state[j].yaw);
                     this->bodies_state[j].global_corners[k] = corner;
                 }
-                if (strcmp(msg->name[i].c_str(), "cardboard_box") == 0)
+                if (strcmp(msg->name[i].c_str(), TARGET_OBJECT) == 0)
                 {
                     double dist = this->euclidean(this->bodies_state[j].cm_position, this->target);
-                    if (dist < 0.1)
+                    ROS_INFO(">>> %f m", dist);
+#ifdef EXPERIMENT_MODE
+                    static bool once = true;
+                    if ((dist > 0.001) && (dist < 2.6/2.0) && once)
                     {
-                        this->bodies_state[j].is_obstacle = true;
+                        once = false;
+                        gazebo_msgs::ModelState new_goal;
+                        new_goal.model_name = TARGET_OBJECT "_goal";
+                        new_goal.pose.position.x = 0.0; 
+                        new_goal.pose.position.y = -1.2;
+                        new_goal.pose.position.z = 0.150000;
+                        this->publish_goal_state.publish(new_goal);
+                        ros::spinOnce();
+                        ROS_INFO("\33[93mUpdate goal!\33[0m");
+                    }
+#endif
+#ifdef PUBLISH_OBJECT_STATE
+                    static geometry_msgs::Vector3 data;
+                    if (dist < 4)
+                    {
+                        data.x = dist;
+                        double vel = sqrt(msg->twist[i].linear.x * msg->twist[i].linear.x + msg->twist[i].linear.y * msg->twist[i].linear.y) * 100;
+                        double gain = 0.05;
+                        data.y = data.y * (1.0f - gain) + vel * (gain);
+                        this->publish_object_state.publish(data);
+                        ros::spinOnce();
+                    }
+#endif
+                    this->bodies_state[2 + this->targets_id].is_obstacle = true;
+                    if (dist < 0.1 && dist > 0.0001)
+                    {
+                        this->bodies_state[2 + this->targets_id].is_obstacle = false;
+                        this->is_running = false;
+                        this->targets_id++;
+
+                        this->targets_id = std::min((int)this->targets_name.size() - 1, this->targets_id);
+                        if ((int)this->targets_name.size() - 1 == this->targets_id)
+                        {
+                            this->bodies_state[j].is_obstacle = true;
+                        }
                     }
                     else
                     {
-                        this->bodies_state[j].is_obstacle = false;
+                        this->is_running = true;
+                        // this->bodies_state[j].is_obstacle = false;
                     }
                 }
             }
@@ -176,12 +305,12 @@ void Controller::r_pose_cb(const nav_msgs::OdometryConstPtr &msg, const std::str
 void Controller::setRobotColor(Robot robot, int colorId)
 {
     std_msgs::ColorRGBA color = this->getColorByType(colorId);
-    gazebo_msgs::SetLightProperties gz_color;
-    gz_color.request.diffuse.a = color.a / 255.0;
-    gz_color.request.diffuse.r = color.r / 255.0;
-    gz_color.request.diffuse.g = color.g / 255.0;
-    gz_color.request.diffuse.b = color.b / 255.0;
-    this->color_service[(int)robot.id].call(gz_color);
+    std_msgs::ColorRGBA color_;
+    color_.a = color.a / 255.0;
+    color_.r = color.r / 255.0;
+    color_.g = color.g / 255.0;
+    color_.b = color.b / 255.0;
+    this->r_cmdcolor_[(int)robot.id].publish(color_);
 }
 
 std_msgs::ColorRGBA Controller::getColorByType(uint8_t type)
@@ -211,9 +340,12 @@ std_msgs::ColorRGBA Controller::getColorByType(uint8_t type)
         color.b = 133;
         break; // medium violet red
     case 4:
-        color.r = 144;
-        color.g = 238;
-        color.b = 144;
+        // color.r = 144;
+        // color.g = 238;
+        // color.b = 144;
+        color.r = 180;
+        color.g = 180;
+        color.b = 180;
         break; // light green
     case 5:
         color.r = 255;
@@ -360,7 +492,7 @@ double Controller::coulombBuckinghamPotential(double r, double eplson, double ep
     return eplson * ((6.0 / (alpha - 6.0)) * exp(alpha) * (1.0 - r / r0) - (alpha / (alpha - 6.0)) * std::pow(r0 / r, 6)) + (q1 * q2) / (4.0 * M_PI * eplson0 * r);
 }
 
-double Controller::fof_Ut(Robot r_i, Vector2 v)
+double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects1)
 {
 
 #ifdef SHOW_GRADIENT_OBJECT_RVIZ
@@ -387,15 +519,12 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
     // for each obstacles point in the world (same when using a laser)
     std::vector<Vector2> objects = this->getObjectPoints(this->sensing, r_i);
     double factor = this->targetOcclusion(r_i, objects);
+
     bool use_cwise = this->goCWise(r_i, objects);
     // ROS_INFO("Robot %f with charge %f", r_i.id, charge);
-
-    static double coef = 1.5;
-    ros::param::get("/ut_coef", coef);
     // ROS_INFO_THROTTLE(1, "Robot %f founded object points: %d", r_i.id, (int)objects.size());
     Vector2 object_contour_grad(0.0, 0.0);
-    double object_mass = 0.0 * this->mass;
-
+    double object_mass = 0.0;
     for (int i = 0; i < objects.size(); i++)
     {
         double dist_i = this->euclidean(r_i.position, objects[i]);
@@ -407,7 +536,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
         // Ut += this->coulombBuckinghamPotential(dist_i * 1.5, 0.04, 0.04, 0.8, 1.0, -32.0, 1.0);
         if (factor >= 5)
         {
-            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -800000.0, 1.0);
+            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -8000000.0, 1.0);
             return Ut;
         }
         else
@@ -434,7 +563,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v)
 
         object_contour_grad.x += (dV.x - v.x);
         object_contour_grad.y += (dV.y - v.y);
-        object_mass += 3.8 * this->mass;
+        object_mass += 8.8 * this->mass;
 
 #ifdef SHOW_GRADIENT_OBJECT_RVIZ
         double dist = this->euclidean(objects[i], objects[(i + 1) % objects.size()]);
@@ -613,16 +742,16 @@ double Controller::targetOcclusion(Robot robot, std::vector<Vector2> objects)
     }
     if ((cwise_counter == 0) || (ccwise_counter == 0))
     {
-        return 1.2;
+        return 2.2;
     }
     double rate = std::min(cwise_counter / (ccwise_counter + DBL_EPSILON), ccwise_counter / (cwise_counter + DBL_EPSILON)) + DBL_EPSILON;
-    if (rate > 0.5)
+    if (rate > 0.4)
     {
         return 5.0;
     }
     else
     {
-        return 1.2;
+        return 2.2;
     }
     // double scale = cwise_counter + ccwise_counter;
     // double k = 1.0/sqrt(scale+DBL_EPSILON) ;//0.25;
@@ -651,7 +780,7 @@ bool Controller::goCWise(Robot robot, std::vector<Vector2> objects)
     for (uint8_t i = 0; i < objects.size(); i++)
     {
         double dist = this->euclidean(robot.position, objects[i]);
-        if ((dist >= this->sensing))// || (distToTarget < this->euclidean(objects[i], goal)))
+        if ((dist >= this->sensing)) // || (distToTarget < this->euclidean(objects[i], goal)))
         {
             continue;
         }
@@ -932,7 +1061,7 @@ std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
         for (uint8_t k = 0; k < this->bodies_state.size(); k++)
         {
             /* Detect only objects */
-            if (!this->bodies_state[k].is_obstacle)
+            if (!this->bodies_state[k].is_obstacle && this->bodies_state[k].name.find("goal") == std::string::npos)
             {
                 // ROS_INFO("Founded an object %s", this->bodies_state[k].name.c_str());
                 /* For each side of polygon */
@@ -941,9 +1070,18 @@ std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
                     Vector2 out;
                     if (this->getSegmentIntersection(r.position, point, this->bodies_state[k].global_corners[i], this->bodies_state[k].global_corners[(i + 1) % this->bodies_state[k].global_corners.size()], out))
                     {
+                        double obstacle_mindist = DBL_MAX;
+                        for (uint8_t w = 0; w < this->bodies_state[0].global_corners.size(); w++)
+                        {
+                            if (this->getSegmentIntersection(r.position, point, this->bodies_state[0].global_corners[w], this->bodies_state[0].global_corners[(w + 1) % this->bodies_state[0].global_corners.size()], out))
+                            {
+                                double ob_dist = this->euclidean(r.position, out);
+                                obstacle_mindist = std::min(obstacle_mindist, ob_dist);
+                            }
+                        }
                         double dist = this->euclidean(r.position, out);
                         // ROS_INFO("Collision at %f with dist %f", step, dist);
-                        if (dist < min_dist)
+                        if (dist < min_dist && dist < obstacle_mindist)
                         {
                             min_dist = dist;
                             min_point = out;
@@ -1105,13 +1243,15 @@ Vector2 Controller::saturation(Vector2 v, double norm)
 
 Vector2 Controller::metropolisHastings(Robot r_i, std::vector<Robot> states_t)
 {
+    std::vector<Vector2> objects = this->getObjectPoints(this->sensing, r_i);
+
     std::vector<Vector2> mcmc_chain;
     mcmc_chain.push_back(r_i.velocity);
 
     std::vector<double> chain_potential;
     chain_potential.push_back(
         this->fof_Us(r_i, r_i.velocity) +
-        this->fof_Ut(r_i, r_i.velocity) +
+        this->fof_Ut(r_i, r_i.velocity, objects) +
         this->fof_Ust(r_i, r_i.velocity, states_t));
 
     // Random Seed for normal distribution
@@ -1138,7 +1278,7 @@ Vector2 Controller::metropolisHastings(Robot r_i, std::vector<Robot> states_t)
         sampled_vel = this->saturation(sampled_vel, this->vmax);
         // Compute the potential for the sampled velocity
         double U = this->fof_Us(r_i, sampled_vel) +
-                   this->fof_Ut(r_i, sampled_vel) +
+                   this->fof_Ut(r_i, sampled_vel, objects) +
                    this->fof_Ust(r_i, sampled_vel, states_t);
         // Accept the sampled velocity over the gibbs distribuition sampling
         double dE = U - last_U;
@@ -1189,12 +1329,14 @@ void Controller::update(long iterations)
     states_t = this->states;
     std::vector<std::vector<Robot>> neighbors = this->getAllRobotsNeighborns(this->states);
 
-    // #pragma omp parallel for ordered schedule(dynamic)
-    // #pragma omp parallel for
+// #pragma omp parallel for ordered schedule(dynamic)
+#ifdef USE_OPENMP_
+#pragma omp parallel for
     for (int i = 0; i < this->robots; ++i)
     {
         Vector2 new_velocity = this->metropolisHastings(states_t[i], neighbors[i]);
     }
+#endif
 
 /* Command goto (x,y) */
 #ifdef SHOW_TARGET_VEL_RVIZ
@@ -1231,6 +1373,7 @@ void Controller::update(long iterations)
         m.scale.x = sqrt(this->states[i].velocity.y * this->states[i].velocity.y + this->states[i].velocity.x * this->states[i].velocity.x);
         m_array.markers.push_back(m);
 #endif
+#ifdef ROBOT_COLOR_STATE
         std::vector<Vector2> objects = this->getObjectPoints(this->sensing, this->states[i]);
         int state_color = 0;
         for (uint8_t k = 0; k < objects.size(); k++)
@@ -1246,17 +1389,37 @@ void Controller::update(long iterations)
                 break;
             }
         }
+#endif
+
+#ifdef ENABLE_FAILURES
+        double failure_prob = ((double)rand() / ((double)(RAND_MAX) + (double)(1)));
+        if (!(this->states[i].is_dead) && (failure_prob < 0.0005) && (num_died_robots < MAX_ROBOTS_FAILS) && (state_color == 2))
+        {
+            this->states[i].is_dead = true;
+            num_died_robots++;
+            ROS_INFO("\33[91m XoX Robot %d is dead!\33[0m", (int)this->states[i].id);
+            geometry_msgs::Twist vel;
+            this->r_cmdvel_[i].publish(vel);
+        }
+        if (this->states[i].is_dead)
+        {
+            this->setRobotColor(this->states[i], 4);
+            continue;
+        }
+#endif
+#ifdef ROBOT_COLOR_STATE
         if (this->states[i].state != state_color)
         {
             this->states[i].state == state_color;
             this->setRobotColor(this->states[i], state_color);
         }
+#endif
+
         // Holonomic to differential driver controller
         geometry_msgs::Twist v;
-        // double theta_ = atan2(this->states[i].position.y - this->global_poses[i].y, this->states[i].position.x - this->global_poses[i].x);
         double theta_ = atan2(this->states[i].velocity.y, this->states[i].velocity.x);
         double err_ = theta_ - this->global_poses[i].theta;
-        double velx = sqrt(this->states[i].velocity.y * this->states[i].velocity.y + this->states[i].velocity.x * this->states[i].velocity.x);
+        double velx = sqrt(this->states[i].velocity.y * this->states[i].velocity.y + this->states[i].velocity.x * this->states[i].velocity.x) * 2.0;
 
         if (err_ > M_PI)
             err_ = -(2.0 * M_PI - err_);
@@ -1265,16 +1428,24 @@ void Controller::update(long iterations)
 
         if (abs(err_) > M_PI / 36.0)
         {
-            v.linear.x = std::min(velx, 0.02);
+            v.linear.x = std::min(velx, 0.06);
             v.angular.z = 1.8 * err_;
         }
         else
         {
-            v.linear.x = std::min(velx, 0.10);
+            v.linear.x = std::min(velx, 0.12);
             v.angular.z = 0.8 * err_;
         }
-
-        this->r_cmdvel_[i].publish(v);
+        if (this->is_running)
+        {
+            this->r_cmdvel_[i].publish(v);
+        }
+        else
+        {
+            geometry_msgs::Twist vel;
+            this->r_cmdvel_[i].publish(vel);
+            ROS_INFO_THROTTLE(1, "\33[91mRobots has stopped!\33[0m");
+        }
     }
 
 #ifdef SHOW_TARGET_VEL_RVIZ
@@ -1282,28 +1453,28 @@ void Controller::update(long iterations)
 #endif
 }
 
-/* MAIN FUNCTION */
-
+/********************************/
+/*               MAIN FUNCTION              */
+/********************************/
 int main(int argc, char **argv)
 {
     srand(time(0));
-    // ROS setups:
+    /* ROS setups */
     ros::init(argc, argv, "grf_controller", ros::init_options::AnonymousName); // node name
-
-    ros::NodeHandle nh("~"); // create a node handle; need to pass this to the class constructor
+    ros::NodeHandle nh("~");                                                   // create a node handle; need to pass this to the class constructor
 
     ROS_INFO("[Main] Instantiating an object of type Controller");
     Controller control(&nh);
 
-    ros::Rate rate(30);
+    ros::Rate rate(15);
     uint64_t iterations = 0;
     while (ros::ok())
     {
         auto t1 = std::chrono::high_resolution_clock::now();
         control.update(0);
         auto t2 = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
-        ROS_INFO_THROTTLE(1, "Loop-time at %f ms", (float) duration * 0.001);
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+        ROS_INFO_THROTTLE(1, "Loop-time at %f ms", (float)duration * 0.001);
         iterations++;
         ros::spinOnce();
         rate.sleep();

@@ -1,5 +1,5 @@
 <launch>
-    <param name="robots" type="int" value="6"/>
+    <param name="robots" type="int" value="4"/>
     <param name="groups" type="int" value="1"/>
     <param name="sensing" type="double" value="0.5"/>
     <param name="worldsize" type="double" value="4.0"/>
@@ -9,50 +9,34 @@
     <param name="vmax" type="double" value="0.3"/>
 
     <include file="$(find hero_gazebo)/launch/hero_spawn.launch">
-        <arg name="x" value="-0.019434076063122818"/>
-        <arg name="y" value="-0.9789008239823896"/>
-        <arg name="z" value="0.55"/>
+        <arg name="x" value="-1.3914415011828618"/>
+        <arg name="y" value="1.708139139971244"/>
+        <arg name="z" value="0.25"/>
         <arg name="id" value="0"/>
         <arg name="type" value="0"/>
     </include>
 
     <include file="$(find hero_gazebo)/launch/hero_spawn.launch">
-        <arg name="x" value="-0.8802938744740392"/>
-        <arg name="y" value="-0.37321232499800305"/>
-        <arg name="z" value="0.55"/>
+        <arg name="x" value="0.8234446806039825"/>
+        <arg name="y" value="-0.5347158987862749"/>
+        <arg name="z" value="0.25"/>
         <arg name="id" value="1"/>
         <arg name="type" value="0"/>
     </include>
 
     <include file="$(find hero_gazebo)/launch/hero_spawn.launch">
-        <arg name="x" value="-0.4416656483119535"/>
-        <arg name="y" value="1.7876672285567374"/>
-        <arg name="z" value="0.55"/>
+        <arg name="x" value="0.7473784977326916"/>
+        <arg name="y" value="1.078576565976194"/>
+        <arg name="z" value="0.25"/>
         <arg name="id" value="2"/>
         <arg name="type" value="0"/>
     </include>
 
     <include file="$(find hero_gazebo)/launch/hero_spawn.launch">
-        <arg name="x" value="-0.3304900788004906"/>
-        <arg name="y" value="0.9788183814229688"/>
-        <arg name="z" value="0.55"/>
+        <arg name="x" value="0.5240226762298531"/>
+        <arg name="y" value="-0.3074414141226011"/>
+        <arg name="z" value="0.25"/>
         <arg name="id" value="3"/>
-        <arg name="type" value="0"/>
-    </include>
-
-    <include file="$(find hero_gazebo)/launch/hero_spawn.launch">
-        <arg name="x" value="0.9379320768319835"/>
-        <arg name="y" value="-0.6839663447328047"/>
-        <arg name="z" value="0.55"/>
-        <arg name="id" value="4"/>
-        <arg name="type" value="0"/>
-    </include>
-
-    <include file="$(find hero_gazebo)/launch/hero_spawn.launch">
-        <arg name="x" value="-0.5524516635742897"/>
-        <arg name="y" value="-0.5336466570123753"/>
-        <arg name="z" value="0.55"/>
-        <arg name="id" value="5"/>
         <arg name="type" value="0"/>
     </include>
 

@@ -35,9 +35,10 @@ while counter < int(args.robots):
     s = get_sample()
     d = q - s
     dist = np.sqrt(np.power(d[:,0],2) + np.power(d[:,1],2))
-    if np.any(dist > 0.30):
-        q = np.append(q, [s], axis=0)
-        counter  += 1
+    if np.any(dist < 0.20):
+        continue
+    q = np.append(q, [s], axis=0)
+    counter  += 1
 # print(q)
 
 launch_file = """<launch>
@@ -76,7 +77,7 @@ for i in range(0, int(args.robots)):
     temp = include_patch
     temp = temp.replace("$X", str(q[i,0]))
     temp = temp.replace("$Y", str(q[i,1]))
-    temp = temp.replace("$Z", str(0.55))
+    temp = temp.replace("$Z", str(0.25))
     temp = temp.replace("$ID", str(i))
     temp = temp.replace("$TYPE", str(int(math.floor(i/r))))
     include_patches += temp

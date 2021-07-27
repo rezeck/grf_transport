@@ -147,6 +147,7 @@ include_directories(
 # add_executable(${PROJECT_NAME}_node src/2021_iros_grf_colletive_transport_node.cpp)
 add_executable(grf_navigation_node src/grf_navigation.cpp)
 add_executable(grf_rl_transport_node src/grf_colletive_transport.cpp)
+add_executable(real_node src/real.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -167,6 +168,10 @@ target_link_libraries(grf_navigation_node
 )
 
 target_link_libraries(grf_rl_transport_node
+  ${catkin_LIBRARIES}  ${OpenCV_LIBS} ${OpenMP_INCLUDE_DIRS}
+)
+
+target_link_libraries(real_node
   ${catkin_LIBRARIES}  ${OpenCV_LIBS} ${OpenMP_INCLUDE_DIRS}
 )
 

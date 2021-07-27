@@ -27,29 +27,60 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <std_msgs/ColorRGBA.h>
-#include <gazebo_msgs/SetLightProperties.h>
+// #include <gazebo_msgs/SetLightProperties.h>
 #include <gazebo_msgs/ModelStates.h>
+#include <gazebo_msgs/ModelState.h>
 
 #include "geometry_msgs/Vector3.h"
 #include "geometry_msgs/Quaternion.h"
 #include "tf/transform_datatypes.h"
 
 #include <omp.h>
+#define USE_OPENMP_
 
-// #define TARGET_X 1.1639
-// #define TARGET_Y 1.6854
+// #define OBJECT_SX 0.8
+// #define OBJECT_SY 0.8
 
-#define SHOW_TARGET_VEL_RVIZ
+// #define OBJECT_SX 2.4
+// #define OBJECT_SY 2.4
+
+#define OBJECT_SX 1.259320
+#define OBJECT_SY 1.007450
+
+// #define OBJECT_SX 2.51864
+// #define OBJECT_SY 2.0149
+
+#define RECTANGLE_PRISM "rectangle_prism"
+#define TRIANGLE_PRIM "triangle_prism"
+#define POLY_PRISM "poly_prism"
+// Choose one above
+#define TARGET_OBJECT RECTANGLE_PRISM
+#define OBJECT_POS_X 0.0
+#define OBJECT_POS_Y 0.0
+
+// #define SHOW_TARGET_VEL_RVIZ
 // #define SHOW_OBSTACLES_RVIZ
 // #define SHOW_OBJECT_RVIZ
 // #define SHOW_GRADIENT_OBJECT_RVIZ
 // #define SHOW_NEIGHBORNS_RVIZ
 
-#define OBJECT_SIZE 0.39704 // (cm)
-#define OBJECT_SX 1.259320
-#define OBJECT_SY 1.007450
+#define ROBOT_COLOR_STATE
 
-#define LASER_RESOLUTION 0.2
+// #define EXPERIMENT_MODE
+// #define ENABLE_FAILURES
+// #define MAX_ROBOTS_FAILS 4
+
+#define PUBLISH_OBJECT_STATE
+
+
+
+// #define OBJECT_SX 1.57415
+// #define OBJECT_SY 1.2593125
+
+// #define OBJECT_SX 1.88898
+// #define OBJECT_SY 1.511175
+
+#define LASER_RESOLUTION 0.1
 
 class Vector2
 {
@@ -69,6 +100,7 @@ public:
     double type;
     double theta;
     int state;
+    bool is_dead;
 };
 
 class Body
@@ -97,8 +129,11 @@ public:
     double mass;
     double vmax;
     double dt;
+    int num_died_robots = 0;
 
     int metric_v;
+
+    bool is_running = true;
 
     std::string worldfile;
     std::string logginfile;
@@ -106,6 +141,8 @@ public:
 
     std::vector<Robot> states;
     std::vector<Body> bodies_state;
+    std::vector<std::string> targets_name;
+    int targets_id;
     Vector2 target;
     boost::mutex mutex;
 
@@ -119,7 +156,7 @@ private:
     std::vector<ros::Publisher> r_cmdvel_;
     std::vector<ros::Subscriber> r_pose_;
     ros::Subscriber gz_model_poses_;
-    std::vector<ros::ServiceClient> color_service;
+    std::vector<ros::Publisher> r_cmdcolor_;
 
     /* Topics Callbacks */
     void r_pose_cb(const nav_msgs::OdometryConstPtr &msg, const std::string &topic, const int &id);
@@ -131,6 +168,12 @@ private:
     ros::Publisher show_obstacles_rviz;
     ros::Publisher show_objects_rviz;
     ros::Publisher show_gradient_object_rviz;
+// #ifdef EXPERIMENT_MODE
+    ros::Publisher publish_goal_state;
+// #endif
+#ifdef PUBLISH_OBJECT_STATE
+    ros::Publisher publish_object_state;
+#endif
 
     std_msgs::ColorRGBA getColorByType(uint8_t type);
     void setRobotColor(Robot robot, int colorId);
@@ -141,7 +184,7 @@ private:
     double kineticEnergy(double v, double m);
     double coulombBuckinghamPotential(double r, double eplson, double eplson0, double r0, double alpha, double q1, double q2);
     double fof_Us(Robot r_i, Vector2 v);
-    double fof_Ut(Robot r_i, Vector2 v);
+    double fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects);
     double fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t);
     double euclidean(Vector2 a, Vector2 b);
     std::vector<Vector2> getObstaclesPoints(double sensing, Robot r);
