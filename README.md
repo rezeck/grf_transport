@@ -23,7 +23,7 @@ This paper presents a novel methodology that allows a swarm of robots to perform
 
 ```sh
 $ cd ~/catkin_ws/src
-$ git clone https://github.com/verlab/2021_iros_grf_colletive_transport.git
+$ git clone https://github.com/verlab/grf_colletive_transport.git
 $ git clone https://github.com/verlab/hero_common.git
 $ catkin build # or catkin_make
 ```
@@ -56,11 +56,11 @@ $ python3 spawn_multi_robots_launch.py --robots 80 --groups 4 > swarm.launch
 ```
 - Now, launch the file using ros and then the robots should start spawning on Gazebo.
 ```sh
-$ roslaunch 2021_iros_grf_colletive_transport swarm.launch
+$ roslaunch grf_colletive_transport swarm.launch
 ```
 - Initial our transport controller
 ```sh
-$ rosrun 2021_iros_grf_colletive_transport grf_rl_transport_node
+$ rosrun grf_colletive_transport grf_rl_transport_node
 ```
 
 <p align="center">
