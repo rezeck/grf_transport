@@ -56,11 +56,11 @@ $ python3 spawn_multi_robots_launch.py --robots 80 --groups 4 > swarm.launch
 ```
 - Now, launch the file using ros and then the robots should start spawning on Gazebo.
 ```sh
-$ roslaunch grf_colletive_transport swarm.launch
+$ roslaunch grf_transport swarm.launch
 ```
 - Initial our transport controller
 ```sh
-$ rosrun grf_colletive_transport grf_rl_transport_node
+$ rosrun grf_transport grf_rl_transport_node
 ```
 
 <p align="center">
