@@ -3,6 +3,16 @@
 
 ```September 27 - October 1, 2021 Prague, Czech Republic, Online```
 
+```
+@inproceedings{rezeck2021collective,
+  title={Collective Transport using {Gibbs} Random Fields},
+  author={Rezeck, Paulo and Assunção, Renato M. and Chaimowicz, Luiz},
+  booktitle={2021  IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  year={2021},
+  organization={IEEE}
+}
+```
+
 ## Abstract
 This paper presents a novel methodology that allows a swarm of robots to perform a cooperative transportation task. Our approach consists of modeling the swarm as a Gibbs Random Field (GRF), taking advantage of this framework's locality properties. By setting appropriate potential functions, robots can dynamically navigate, form groups, and perform cooperative transportation in a completely decentralized fashion. Moreover, these behaviors emerge from the local interactions without the need for explicit communication or coordination. To evaluate our methodology, we perform a series of simulations and proof-of-concept experiments in different scenarios. Our results show that the method is scalable, adaptable, and robust to failures and changes in the environment.
 
@@ -23,7 +33,7 @@ This paper presents a novel methodology that allows a swarm of robots to perform
 
 ```sh
 $ cd ~/catkin_ws/src
-$ git clone https://github.com/verlab/2021_iros_grf_colletive_transport.git
+$ git clone https://github.com/verlab/grf_colletive_transport.git
 $ git clone https://github.com/verlab/hero_common.git
 $ catkin build # or catkin_make
 ```
@@ -56,11 +66,11 @@ $ python3 spawn_multi_robots_launch.py --robots 80 --groups 4 > swarm.launch
 ```
 - Now, launch the file using ros and then the robots should start spawning on Gazebo.
 ```sh
-$ roslaunch 2021_iros_grf_colletive_transport swarm.launch
+$ roslaunch grf_transport swarm.launch
 ```
 - Initial our transport controller
 ```sh
-$ rosrun 2021_iros_grf_colletive_transport grf_rl_transport_node
+$ rosrun grf_transport grf_rl_transport_node
 ```
 
 <p align="center">
@@ -77,16 +87,6 @@ $ rosrun 2021_iros_grf_colletive_transport grf_rl_transport_node
   booktitle={2017 Latin American Robotics Symposium (LARS) and 2017 Brazilian Symposium on Robotics (SBR)},
   pages={1--6},
   year={2017},
-  organization={IEEE}
-}
-```
-- This work:
-```
-@inproceedings{rezeck2021collective,
-  title={Collective Transport using {Gibbs} Random Fields},
-  author={Rezeck, Paulo and Assunção, Renato M. and Chaimowicz, Luiz},
-  booktitle={2021  IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
-  year={2021},
   organization={IEEE}
 }
 ```
