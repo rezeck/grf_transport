@@ -44,19 +44,19 @@
 // #define OBJECT_SX 2.4
 // #define OBJECT_SY 2.4
 
-#define OBJECT_SX 1.259320
-#define OBJECT_SY 1.007450
+// #define OBJECT_SX 1.259320
+// #define OBJECT_SY 1.007450
 
 // #define OBJECT_SX 2.51864
 // #define OBJECT_SY 2.0149
 
-#define RECTANGLE_PRISM "rectangle_prism"
-#define TRIANGLE_PRIM "triangle_prism"
-#define POLY_PRISM "poly_prism"
+#define RECTANGLE_PRISM "rectangular_prism"
+#define TRIANGLE_PRIM "triangular_prism"
+#define POLY_PRISM "polygonal_prism"
 // Choose one above
 #define TARGET_OBJECT RECTANGLE_PRISM
-#define OBJECT_POS_X 0.0
-#define OBJECT_POS_Y 0.0
+// #define OBJECT_POS_X 0.0
+// #define OBJECT_POS_Y 0.0
 
 // #define SHOW_TARGET_VEL_RVIZ
 // #define SHOW_OBSTACLES_RVIZ
@@ -70,7 +70,7 @@
 // #define ENABLE_FAILURES
 // #define MAX_ROBOTS_FAILS 4
 
-#define PUBLISH_OBJECT_STATE
+// #define PUBLISH_OBJECT_STATE
 
 
 
@@ -121,16 +121,26 @@ public:
     // WiseRobot Constructor
     Controller(ros::NodeHandle *nodehandle);
 
-    int robots;
-    int groups;
-    double sensing;
-    double worldsize;
-    double safezone;
-    double mass;
-    double vmax;
-    double dt;
-    int num_died_robots = 0;
+    // Robot parameters
+    int robots = 10;
+    int groups = 0;
+    double sensing = 0.5;
+    double safezone = 0.15;
+    double mass = 5.0;
+    double vmax = 0.3;
+    double dt = 0.01;
 
+    // Environment parameters
+    std::string environment_name = "arena_1";
+    double worldsize = 3.8;
+
+    // Object parameters
+    std::string object_shape = "rectangular_prism";
+    double scale_x = 1.0;
+    double scale_y = 1.0;
+
+    
+    int num_died_robots = 0;
     int metric_v;
 
     bool is_running = true;
@@ -154,26 +164,39 @@ private:
 
     /* Topics and Services */
     std::vector<ros::Publisher> r_cmdvel_;
+    std::string cmd_vel_topic = "/cmd_vel";
     std::vector<ros::Subscriber> r_pose_;
+    std::string odom_topic =  "/odom";
     ros::Subscriber gz_model_poses_;
     std::vector<ros::Publisher> r_cmdcolor_;
+    std::string led_topic =  "/led";
 
     /* Topics Callbacks */
     void r_pose_cb(const nav_msgs::OdometryConstPtr &msg, const std::string &topic, const int &id);
     void gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg);
 
     /* RViz debug topics */
-    ros::Publisher show_target_vel_rviz;
-    ros::Publisher show_neighborns_rviz;
-    ros::Publisher show_obstacles_rviz;
-    ros::Publisher show_objects_rviz;
-    ros::Publisher show_gradient_object_rviz;
+    ros::Publisher pub_target_vel_markers;
+    std::string pub_target_vel_markers_topic = "/show_target_vel_rviz";
+    bool pub_target_vel_markers_rviz = false;
+    ros::Publisher pub_neighborns_markers;
+    std::string pub_neighborns_markers_topic = "/show_neighborns_rviz";
+    bool pub_neighborns_markers_rviz = false;
+    ros::Publisher pub_obstacles_markers;
+    std::string pub_obstacles_markers_topic = "/show_obstacles_rviz";
+    bool pub_obstacles_markers_rviz = false;
+    ros::Publisher pub_objects_markers;
+    std::string pub_objects_markers_topic = "/show_objects_rviz";
+    bool pub_objects_markers_rviz = true;
+    ros::Publisher pub_gradient_object;
+    std::string pub_gradient_object_topic = "/show_gradient_object_rviz";
+    bool pub_gradient_object_rviz = false;
+    ros::Publisher pub_object_state;
+    std::string pub_object_state_topic = "/object_state";
+    bool pub_object_state_rviz = true;
 // #ifdef EXPERIMENT_MODE
-    ros::Publisher publish_goal_state;
-// #endif
-#ifdef PUBLISH_OBJECT_STATE
-    ros::Publisher publish_object_state;
-#endif
+    // ros::Publisher publish_goal_state;
+    // Publish object pose
 
     std_msgs::ColorRGBA getColorByType(uint8_t type);
     void setRobotColor(Robot robot, int colorId);
