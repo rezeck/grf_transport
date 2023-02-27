@@ -145,7 +145,7 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle) {  // con
     this->targets_name.push_back(std::string("target_") + this->object_shape);
     this->targets_id = 0;
     object_.name = std::string("target_") + this->object_shape;
-    object_.is_obstacle = true;
+    object_.is_obstacle = false;
     this->bodies_state.push_back(object_);
 
     // this->targets_name.push_back("rectangle_prism_goal_0");
@@ -230,15 +230,15 @@ void Controller::gz_poses_cb(const gazebo_msgs::ModelStatesConstPtr &msg) {
                             ros::spinOnce();
                         }
                     }
-                    this->bodies_state[2 + this->targets_id].is_obstacle = true;
+                    // this->bodies_state[2 + this->targets_id].is_obstacle = true;
                     if (dist < 0.1 && dist > 0.0001) {
-                        this->bodies_state[2 + this->targets_id].is_obstacle = false;
+                        // this->bodies_state[2 + this->targets_id].is_obstacle = false;
                         this->is_running = false;
-                        this->targets_id = (this->targets_id + 1) % (int)this->targets_name.size();
-
+                        this->targets_id++;
                         this->targets_id = std::min((int)this->targets_name.size() - 1, this->targets_id);
                         if ((int)this->targets_name.size() - 1 == this->targets_id) {
                             this->bodies_state[j].is_obstacle = true;
+                            this->targets_id = 0;
                         }
                     } else {
                         this->is_running = true;
