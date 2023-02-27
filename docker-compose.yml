@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  ros1:
+    image: grf_swarm_tranport:v1.0
+    container_name: grf-swarm-tranport
+    build:
+      context: ./
+      dockerfile: dockerfile
+    network_mode: host
+    environment:
+      - DISPLAY
+      - PYTHONUNBUFFERED=1
+      - HERO_SIM=1
+    ipc: none
+    volumes:
+    - $HOME/.Xauthority:/root/.Xauthority:rw
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    privileged: true # required for gazebo/rviz
+    # command: /bin/bash -c '. /opt/ros/noetic/setup.bash && . /catkin_ws/devel/setup.bash && roslaunch hero_bringup hero_bringup.launch'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
