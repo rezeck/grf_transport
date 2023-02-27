@@ -1,0 +1,51 @@
+# Number of robots in the environment
+robots: 10
+# Number of groups of robots (not used)
+groups: 1
+# Max sensing rance (m)
+sensing: 0.5
+# Max safe zone distance (m)
+safezone: 0.15
+# Control time interval (seconds)
+dt: 0.01
+# Mass of the robot
+mass: 5.0
+# Max velocity of the robot (m/s)
+vmax: 0.3
+
+# Environment size (m) - (Need to be the same as state in the environment urdf file)
+worldsize: 3.85
+# Environment name
+environment_name: 'arena_1'
+environment_coordinates_x: [-0.5, 0.5, 0.5, -0.5]
+environment_coordinates_y: [-0.5, -0.5, 0.5, 0.5]
+
+# environment_name: 'arena_4'
+# environment_coordinates_x: [0.44871794871794873, 0.1730769230769231, 0.1730769230769231, 0.16025641025641027, 0.16025641025641027, -0.44871794871794873, -0.5, -0.5, -0.44871794871794873, -0.1730769230769231, -0.1730769230769231, -0.16025641025641027, -0.16025641025641027, 0.44871794871794873, 0.5, 0.5]
+# environment_coordinates_y: [-0.5, -0.5, 0.0, 0.0, -0.5, -0.5, -0.44871794871794873, 0.44871794871794873, 0.5, 0.5, 0.0, 0.0, 0.5, 0.5, 0.44871794871794873, -0.44871794871794873]
+
+# Visual debug RViz 
+pub_object_state_rviz: False
+pub_object_state_topic: "/object_state"
+
+pub_gradient_object_rviz: False
+pub_gradient_object_topic: "/show_gradient_object_rviz"
+
+pub_objects_markers_rviz: True
+pub_objects_markers_topic: "/show_objects_rviz"
+
+pub_obstacles_markers_rviz: True
+pub_obstacles_markers_topic: "/show_obstacles_rviz"
+
+pub_neighborns_markers_rviz: False
+pub_neighborns_markers_topic: "/show_neighborns_rviz"
+
+pub_target_vel_markers_rviz: True
+pub_target_vel_markers_topic: "/show_target_vel_rviz"
+
+# ROS parameters
+cmd_vel_topic: '/cmd_vel'
+odom_topic: '/odom'
+led_topic: '/led'
+model_state_topic: '/gazebo/model_states'
+set_model_state_topic: '/gazebo/set_model_states'
