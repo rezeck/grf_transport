@@ -1,0 +1,8 @@
+<launch>
+    <!-- GRF Params -->
+    <rosparam command="load" file="$(find grf_transport)/config/params.yaml" />
+
+    <node name="grf_controller" pkg="grf_transport"
+        type="grf_colletive_transport_node" output="screen" required="true"></node>
+
+</launch>
