@@ -1,7 +1,3 @@
----
-class: wide
----
-
 <!-- <h1 align="center">Cooperative Object Transportation using Gibbs Random Fields</h1>
 <p align="center">2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS 2021)</p> -->
 
@@ -115,47 +111,46 @@ apt-get install -y \
 
 <h3 align="left">Execution</h3>
 
+- First, start Gazebo simulator:
+```sh
+roslaunch hero_gazebo gazebo_bringup.launch
+```
+<p align="center">
+<img src="https://user-images.githubusercontent.com/14208261/222988971-ec5c9e56-2743-4e45-a0bb-23ce0301ce65.png" width="600"></p>
+
+- Then, spawn the objects:
+```sh
+roslaunch grf_transport spawn_object.launch
+```
+<p align="center">
+<img src="https://user-images.githubusercontent.com/14208261/222989074-b8048ee4-7d25-4df4-a5c5-8872401348f1.png" width="600"></p>
+
+- Now, spawn the robots and the environment ( and unpause Gazebo):
+```sh
+roslaunch grf_transport spawn_robots.launch
+```
+<p align="center">
+<img src="https://user-images.githubusercontent.com/14208261/222989868-cadc0e69-bb57-4669-9c36-dc4ead95db17.png" width="600"></p>
+
+- Start GRF controller:
+```sh
+roslaunch grf_transport grf_controller.launch
+```
+<p align="center">
+<img src="https://user-images.githubusercontent.com/14208261/222990076-e2ead94e-3396-4ee1-8c3b-4c67cd272ea6.png" width="600"></p>
+
+- RViz launch (for debug):
+```sh
+roscd grf_transport/config/  \
+&& rosrun rviz rviz -d config.rviz
+```
+<p align="center">
+<img src="https://user-images.githubusercontent.com/14208261/222990175-a25ac7cf-0a09-4f02-bd56-8b4b6ed749fe.png" width="600"></p>
+
+
+<h3 align="left">Parameters</h3>
+
 ---
-
-## Usage
-
-- How to run the algorithm proposed in this work?
-
-### Launching HeRo gazebo
-```sh
-$ roslaunch hero_gazebo gazebo_bringup.launch 
-```
-<p align="center">
-  <img width="500" src="resources/gazebo_hero.png">
-</p>
-
-### Start our code
-- Use the script ```spawn_multi_robots_launch.py``` to create a ```.launch``` file with a pre-set environment.
-```sh
-$ python spawn_multi_robots_launch.py --help
-usage: spawn_multi_robots_launch.py [-h] [--robots ROBOTS] [--groups GROUPS]
-                                    [--sensing SENSING]
-                                    [--worldsize WORLDSIZE]
-                                    [--safezone SAFEZONE] [--dt DT]
-                                    [--mass MASS] [--vmax VMAX] [--seed SEED]
-```
-- For example:
-```sh
-$ python3 spawn_multi_robots_launch.py --robots 80 --groups 4 > swarm.launch
-```
-- Now, launch the file using ros and then the robots should start spawning on Gazebo.
-```sh
-$ roslaunch grf_transport swarm.launch
-```
-- Initial our transport controller
-```sh
-$ rosrun grf_transport grf_rl_transport_node
-```
-
-<p align="center">
-  <img width="500" src="resources/heros.png">
-</p>
-
 
 
 <h2>Related Publications</h2>
