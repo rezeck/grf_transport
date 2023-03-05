@@ -1,46 +1,114 @@
----
-class: wide
----
+<h1 align="center">Cooperative Object Transportation using Gibbs Random Fields</h1>
+<p align="center">2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS 2021)</p>
 
-# Collective Transport using Gibbs Random Fields
-```2021 IEEE/RSJ International Conference on Intelligent Robots and Systems```
 
-```September 27 - October 1, 2021 Prague, Czech Republic, Online```
+<p align="center">
+<a href="https://www.youtube.com/watch?v=hrkJKL3W3pQ"><img src="https://img.youtube.com/vi/hrkJKL3W3pQ/0.jpg" width="500"></a></p>
+
+<p align="center">
+This paper presents a novel methodology that allows a swarm of robots to perform a cooperative transportation task. Our approach consists of modeling the swarm as a Gibbs Random Field (GRF), taking advantage of this framework's locality properties. By setting appropriate potential functions, robots can dynamically navigate, form groups, and perform cooperative transportation in a completely decentralized fashion. Moreover, these behaviors emerge from the local interactions without the need for explicit communication or coordination. To evaluate our methodology, we perform a series of simulations and proof-of-concept experiments in different scenarios. Our results show that the method is scalable, adaptable, and robust to failures and changes in the environment.</p>
+
+
+<h2 align="left">Citation</h2>
 
 ```
 @inproceedings{rezeck2021collective,
-  title={Collective Transport using {Gibbs} Random Fields},
   author={Rezeck, Paulo and Assunção, Renato M. and Chaimowicz, Luiz},
-  booktitle={2021  IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  booktitle={2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)}, 
+  title={Cooperative Object Transportation using Gibbs Random Fields}, 
   year={2021},
-  organization={IEEE}
+  volume={},
+  number={},
+  pages={9131-9138},
+  doi={10.1109/IROS51168.2021.9635928}
 }
 ```
+---
 
-## Abstract
-This paper presents a novel methodology that allows a swarm of robots to perform a cooperative transportation task. Our approach consists of modeling the swarm as a Gibbs Random Field (GRF), taking advantage of this framework's locality properties. By setting appropriate potential functions, robots can dynamically navigate, form groups, and perform cooperative transportation in a completely decentralized fashion. Moreover, these behaviors emerge from the local interactions without the need for explicit communication or coordination. To evaluate our methodology, we perform a series of simulations and proof-of-concept experiments in different scenarios. Our results show that the method is scalable, adaptable, and robust to failures and changes in the environment.
+<h2 align="left">Usage</h2>
+<h3 align="left">Prerequisites</h3>
 
-<p align="center">
-  <img width="500" src="resources/transport.png">
-</p>
+- Ubuntu 18.04/20.04
+- ROS Melodic/Noetic
+- Gazebo 11
+- [HeRo common package](https://verlab.github.io/hero_common)
 
+<h3 align="left">Installation</h3>
+<h4 align="left"><b>Option 1:</b> For Docker users</h4>
 
-## Dependecies
-
--   [ROS Melodic](http://wiki.ros.org/melodic/Installation)
--   [HeRo Gazebo](github.com/verlab/hero_common)
-
-
-## Installation
-
--   Using git (or download the zip file) clone this repository into the "source code" folder of your ROS workspace (e.g. ~/catkin_ws/src ).
-
+- Download this repository (1 of 2):
 ```sh
-$ cd ~/catkin_ws/src
-$ git clone https://github.com/verlab/grf_colletive_transport.git
-$ git clone https://github.com/verlab/hero_common.git
-$ catkin build # or catkin_make
+git clone https://github.com/verlab/grf_colletive_transport.git /
+&& cd grf_colletive_transport
 ```
+- Build docker image (2 of 2):
+```sh
+docker-compose build \
+&& docker images
+```
+```
+REPOSITORY                   TAG               IMAGE ID       CREATED         SIZE
+grf_swarm_tranport           v1.0              f18898a6cb7a   6 days ago      3.89GB
+```
+
+<h4 align="left"><b>Option 2:</b> System installation</h4>
+
+- Access your ROS workspace directory (1 of 5):
+```sh
+CATKIN_DIR=~/catkin_ws
+cd $CATKIN_DIR
+```
+- Install dependecies (2 of 5):
+```sh
+apt-get install -y \
+      qt5-default \
+      python3-pyqt5 \
+      ros-${ROS_DISTRO}-robot-state-publisher \
+      ros-${ROS_DISTRO}-usb-cam \
+      ros-${ROS_DISTRO}-xacro \
+      ros-${ROS_DISTRO}-urdfdom-py \
+      ros-${ROS_DISTRO}-rosserial \
+      ros-${ROS_DISTRO}-rosserial-server \
+      ros-${ROS_DISTRO}-urdf \
+      ros-${ROS_DISTRO}-teleop-twist-keyboard \
+      ros-${ROS_DISTRO}-rviz \
+      ros-${ROS_DISTRO}-gazebo-ros-pkgs \
+      ros-${ROS_DISTRO}-gazebo-plugins \
+      ros-${ROS_DISTRO}-gazebo-ros-control
+```
+- Install gazebo_ros  (3 of 5):
+```sh
+    cd $CATKIN_DIR/src \
+    && git clone https://github.com/ros-simulation/gazebo_ros_pkgs.git \
+    && cd gazebo_ros_pkgs \
+    && git checkout b0ed38f9ecedbe929340f5e8b0aa7a457248e015 #branch before tf_prefix deprecation decision \ 
+    && cd $CATKIN_DIR \
+    && /bin/bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && rosdep install --from-paths src --ignore-src -r -y \
+    && catkin_make"
+```
+
+- Install hero common package (4 of 5):
+```sh
+    cd $CATKIN_DIR/src \
+    && git clone --depth 1 --branch noetic-devel https://github.com/verlab/hero_common.git \
+    && cd $CATKIN_DIR \
+    && /bin/bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && rosdep install --from-paths src --ignore-src -r -y \
+    && catkin_make"
+```
+
+- Install this GRF transport package (5 of 5):
+```sh
+  cd $CATKIN_DIR/src /
+  && git clone https://github.com/verlab/grf_colletive_transport.git /
+  && cd $CATKIN_DIR /
+  && /bin/bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && rosdep install --from-paths src --ignore-src -r -y \
+    && catkin_make"
+```
+
+
+<h3 align="left">Execution</h3>
+
+---
 
 ## Usage
 
@@ -82,15 +150,9 @@ $ rosrun grf_transport grf_rl_transport_node
 </p>
 
 
-## Citation
-- HeRo Gazebo:
-```
-@inproceedings{rezeck2017hero,
-  title={HeRo: An open platform for robotics research and education},
-  author={Rezeck, Paulo and Azpurua, Hector and Chaimowicz, Luiz},
-  booktitle={2017 Latin American Robotics Symposium (LARS) and 2017 Brazilian Symposium on Robotics (SBR)},
-  pages={1--6},
-  year={2017},
-  organization={IEEE}
-}
-```
+
+<h2>Related Publications</h2>
+
+- hero
+- grf segregation
+- grf pattern formation
