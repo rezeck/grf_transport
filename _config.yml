@@ -1,5 +1,5 @@
 
-theme: midnight
+theme: jekyll-theme-midnight
 title: Cooperative Object Transportation using Gibbs Random Fields
 email: rezeck@dcc.ufmg.br
 description: Dynamic Gibbs random field applied to swarm cooperative object transportation.
