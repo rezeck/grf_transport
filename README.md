@@ -1,3 +1,7 @@
+---
+class: wide
+---
+
 # Collective Transport using Gibbs Random Fields
 ```2021 IEEE/RSJ International Conference on Intelligent Robots and Systems```
 
