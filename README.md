@@ -1,9 +1,16 @@
-<h1 align="center">Cooperative Object Transportation using Gibbs Random Fields</h1>
-<p align="center">2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS 2021)</p>
+---
+class: wide
+---
 
+<!-- <h1 align="center">Cooperative Object Transportation using Gibbs Random Fields</h1>
+<p align="center">2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS 2021)</p> -->
+
+
+<!-- <p align="center">
+<a href="https://www.youtube.com/watch?v=hrkJKL3W3pQ"><img src="https://img.youtube.com/vi/hrkJKL3W3pQ/0.jpg" width="500"></a></p> -->
 
 <p align="center">
-<a href="https://www.youtube.com/watch?v=hrkJKL3W3pQ"><img src="https://img.youtube.com/vi/hrkJKL3W3pQ/0.jpg" width="500"></a></p>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/hrkJKL3W3pQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></p>
 
 <p align="center">
 This paper presents a novel methodology that allows a swarm of robots to perform a cooperative transportation task. Our approach consists of modeling the swarm as a Gibbs Random Field (GRF), taking advantage of this framework's locality properties. By setting appropriate potential functions, robots can dynamically navigate, form groups, and perform cooperative transportation in a completely decentralized fashion. Moreover, these behaviors emerge from the local interactions without the need for explicit communication or coordination. To evaluate our methodology, we perform a series of simulations and proof-of-concept experiments in different scenarios. Our results show that the method is scalable, adaptable, and robust to failures and changes in the environment.</p>
