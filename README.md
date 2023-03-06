@@ -84,7 +84,7 @@ apt-get install -y \
     cd $CATKIN_DIR/src \
     && git clone https://github.com/ros-simulation/gazebo_ros_pkgs.git \
     && cd gazebo_ros_pkgs \
-    && git checkout b0ed38f9ecedbe929340f5e8b0aa7a457248e015 #branch before tf_prefix deprecation decision \ 
+    && git checkout b0ed38f9ecedbe929340f5e8b0aa7a457248e015 \ #branch before tf_prefix deprecation decision
     && cd $CATKIN_DIR \
     && /bin/bash -c "source /opt/ros/${ROS_DISTRO}/setup.bash && rosdep install --from-paths src --ignore-src -r -y \
     && catkin_make"
@@ -148,13 +148,48 @@ roscd grf_transport/config/  \
 <img src="https://user-images.githubusercontent.com/14208261/222990175-a25ac7cf-0a09-4f02-bd56-8b4b6ed749fe.png" width="600"></p>
 
 
-<h3 align="left">Parameters</h3>
+<h3 align="left">Setup</h3>
+- How change the number of robots?
+
+```sh
+roslaunch hero_gazebo gazebo_wizard.launch
+```
+<p align="center">
+<img src="https://user-images.githubusercontent.com/14208261/222992920-4bea83ab-e3af-447f-9f0c-121eb1d1de6a.png" width="600"></p>
+
+Also set the number of robots in the grf controller ```param.yaml``` file:
+
+```
+# Number of robots in the environment
+robots: 30
+.
+.
+.
+```
+
+- How to change the object?
+
+Edit the launch ```spawn_object.launch``` and select the object you want to spawn:
+
+```
+<!-- Select a object shape: "rectangular_prism, triangular_prism, polygonal_prism" -->
+    <arg name="object_shape" default="rectangular_prism" />
+    <param name="object_shape" value="$(arg object_shape)" />
+```
 
 ---
 
-
 <h2>Related Publications</h2>
 
-- hero
-- grf segregation
-- grf pattern formation
+```
+Rezeck, P., Azpurua, H., Correa, M. F., & Chaimowicz, L. (2022). Hero 2.0: A low-cost robot for swarm robotics research. arXiv preprint arXiv:2202.12391.
+```
+
+```
+P. Rezeck and L. Chaimowicz, "Chemistry-Inspired Pattern Formation With Robotic Swarms," in IEEE Robotics and Automation Letters, vol. 7, no. 4, pp. 9137-9144, Oct. 2022, doi: 10.1109/LRA.2022.3190638.
+```
+
+```
+P. Rezeck, R. M. Assunção and L. Chaimowicz, "Flocking-Segregative Swarming Behaviors using Gibbs Random Fields," 2021 IEEE International Conference on Robotics and Automation (ICRA), Xi'an, China, 2021, pp. 8757-8763, doi: 10.1109/ICRA48506.2021.9561412.
+```
+
