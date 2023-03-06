@@ -3,3 +3,5 @@ theme: jekyll-theme-midnight
 title: Cooperative Object Transportation using Gibbs Random Fields
 email: rezeck@dcc.ufmg.br
 description: 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems
+
+full-width: true
