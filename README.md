@@ -181,15 +181,9 @@ Edit the launch ```spawn_object.launch``` and select the object you want to spaw
 
 <h2>Related Publications</h2>
 
-```
-Rezeck, P., Azpurua, H., Correa, M. F., & Chaimowicz, L. (2022). Hero 2.0: A low-cost robot for swarm robotics research. arXiv preprint arXiv:2202.12391.
-```
+- Rezeck, P., Azpurua, H., Correa, M. F., & Chaimowicz, L. (2022). Hero 2.0: A low-cost robot for swarm robotics research. arXiv preprint arXiv:2202.12391.
 
-```
-P. Rezeck and L. Chaimowicz, "Chemistry-Inspired Pattern Formation With Robotic Swarms," in IEEE Robotics and Automation Letters, vol. 7, no. 4, pp. 9137-9144, Oct. 2022, doi: 10.1109/LRA.2022.3190638.
-```
+- P. Rezeck and L. Chaimowicz, "Chemistry-Inspired Pattern Formation With Robotic Swarms," in IEEE Robotics and Automation Letters, vol. 7, no. 4, pp. 9137-9144, Oct. 2022, doi: 10.1109/LRA.2022.3190638.
 
-```
-P. Rezeck, R. M. Assunção and L. Chaimowicz, "Flocking-Segregative Swarming Behaviors using Gibbs Random Fields," 2021 IEEE International Conference on Robotics and Automation (ICRA), Xi'an, China, 2021, pp. 8757-8763, doi: 10.1109/ICRA48506.2021.9561412.
-```
+- P. Rezeck, R. M. Assunção and L. Chaimowicz, "Flocking-Segregative Swarming Behaviors using Gibbs Random Fields," 2021 IEEE International Conference on Robotics and Automation (ICRA), Xi'an, China, 2021, pp. 8757-8763, doi: 10.1109/ICRA48506.2021.9561412.
 
