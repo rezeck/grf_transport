@@ -1,8 +1,3 @@
----
-class: wide
----
-
-
 <!-- <h1 align="center">Cooperative Object Transportation using Gibbs Random Fields</h1>
 <p align="center">2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS 2021)</p> -->
 
