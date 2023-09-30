@@ -31,6 +31,8 @@
 #include <gazebo_msgs/ModelStates.h>
 #include <gazebo_msgs/ModelState.h>
 
+#include <xmlrpcpp/XmlRpcValue.h> 
+
 #include "geometry_msgs/Vector3.h"
 #include "geometry_msgs/Quaternion.h"
 #include "tf/transform_datatypes.h"
@@ -58,13 +60,7 @@
 // #define OBJECT_POS_X 0.0
 // #define OBJECT_POS_Y 0.0
 
-// #define SHOW_TARGET_VEL_RVIZ
-// #define SHOW_OBSTACLES_RVIZ
-// #define SHOW_OBJECT_RVIZ
-// #define SHOW_GRADIENT_OBJECT_RVIZ
-// #define SHOW_NEIGHBORNS_RVIZ
-
-#define ROBOT_COLOR_STATE
+// #define ROBOT_COLOR_STATE
 
 // #define EXPERIMENT_MODE
 // #define ENABLE_FAILURES
@@ -72,15 +68,13 @@
 
 // #define PUBLISH_OBJECT_STATE
 
-
-
 // #define OBJECT_SX 1.57415
 // #define OBJECT_SY 1.2593125
 
 // #define OBJECT_SX 1.88898
 // #define OBJECT_SY 1.511175
 
-#define LASER_RESOLUTION 0.1
+#define LASER_RESOLUTION 0.05
 
 class Vector2
 {
@@ -89,6 +83,16 @@ public:
     Vector2(double x_, double y_) : x(x_), y(y_){};
     double x;
     double y;
+};
+
+class LineStruct
+{
+public:
+    Vector2 start;
+    Vector2 end;
+
+    LineStruct() : start(Vector2()), end(Vector2()) {}
+    LineStruct(Vector2 start_, Vector2 end_) : start(start_), end(end_) {}
 };
 
 class Robot
@@ -109,8 +113,8 @@ public:
     std::string name;
     Vector2 cm_position;
     geometry_msgs::Quaternion cm_orientation;
-    std::vector<Vector2> global_corners;
-    std::vector<Vector2> local_corners;
+    std::vector<LineStruct> global_lines;
+    std::vector<LineStruct> local_lines;    
     double roll, pitch, yaw;
     bool is_obstacle = false;
 };
@@ -206,7 +210,7 @@ private:
 
     double kineticEnergy(double v, double m);
     double coulombBuckinghamPotential(double r, double eplson, double eplson0, double r0, double alpha, double q1, double q2);
-    double fof_Us(Robot r_i, Vector2 v);
+    double fof_Us(Robot r_i, Vector2 v, std::vector<Vector2> obstacles);
     double fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects);
     double fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t);
     double euclidean(Vector2 a, Vector2 b);
@@ -217,8 +221,9 @@ private:
     bool onSegment(Vector2 p, Vector2 q, Vector2 r);
     int orientation(Vector2 p, Vector2 q, Vector2 r);
     bool doIntersect(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2);
-    int doIntersectWithObstacle(Vector2 p1, Vector2 q1, std::vector<Vector2> obstacle);
+    bool doIntersectWithObstacle(Vector2 p1, Vector2 q1);
     bool getSegmentIntersection(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2, Vector2 &out);
+    Vector2 getClosestIntersectionPoint(LineStruct line, bool is_obstacle);
 
     double targetOcclusion(Robot robot, std::vector<Vector2> objects);
     bool goCWise(Robot robot, std::vector<Vector2> objects);
