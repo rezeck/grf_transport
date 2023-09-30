@@ -16,11 +16,10 @@ services:
     - $HOME/.Xauthority:/root/.Xauthority:rw
     - /tmp/.X11-unix:/tmp/.X11-unix:rw
     privileged: true # required for gazebo/rviz
-    # command: /bin/bash -c '. /opt/ros/noetic/setup.bash && . /catkin_ws/devel/setup.bash && roslaunch hero_bringup hero_bringup.launch'
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    runtime: nvidia
+    devices:
+      - /dev/nvidia0:/dev/nvidia0
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia-uvm:/dev/nvidia-uvm
+    command: /bin/bash -c '. /opt/ros/noetic/setup.bash && . /catkin_ws/devel/setup.bash && roslaunch hero_bringup hero_confmode.launch' #hero_bringup.launch'
+    
