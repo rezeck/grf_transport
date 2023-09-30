@@ -635,9 +635,9 @@ double Controller::fof_Us(Robot r_i, Vector2 v, std::vector<Vector2> obstacles)
     {
         // lets compute the distance to the obstacle (we only use the distance)
         double dist = this->euclidean(r_i.position, obstacles[i]);
-        if (dist <= 1.1 * this->safezone)
+        if (dist <= this->safezone*1.5)
         {
-            Us += this->coulombBuckinghamPotential(dist * 0.8, 0.04, 0.04, 0.8, 1.0, 16.0, 1.0);
+            Us += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 1.0, 50.0, 1.0);
         }
     }
 
@@ -649,37 +649,39 @@ double Controller::fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t)
     // Simulated (kinematic model of the robot) the motion of the robot using the sampled velocity
     r_i.position.x += v.x * this->dt;
     r_i.position.y += v.y * this->dt;
+
     // Get the sum of the relative velocity of all my neighbor and they mass
     Vector2 group_vrel;
     double group_mass = this->mass;
+
     // Get the pairwise potential for the sampled velocity
     double Ust = 0.0f;
+
     // for each neighborn in current state
-    // #ifdef _OPENMP
-    // #pragma omp parallel for
-    // #endif
     for (int i = 0; i < states_t.size(); ++i)
     {
-        Vector2 n_p;
-        n_p.x = states_t[i].position.x + states_t[i].velocity.x * this->dt;
-        n_p.y = states_t[i].position.y + states_t[i].velocity.y * this->dt;
-        double dist = this->euclidean(r_i.position, n_p);
+        Vector2 neigborn_pos = {states_t[i].position.x + states_t[i].velocity.x * this->dt,
+                       states_t[i].position.y + states_t[i].velocity.y * this->dt};
+
+        double dist = this->euclidean(r_i.position, neigborn_pos);
+
         // double dist = this->euclidean(r_i.position, states_t[i].position);
         // Indicator function f: 1 -> same type, f: -1 -> otherwise
         double I = 2.0 * (int)(r_i.type == states_t[i].type) - 1.0;
 
-        // Don`t be to reative to robot of different type
-        if ((I < 0) && (dist > this->safezone * 1.2))
+        // Don`t be too reative to robot of different type
+        if ((I < 0) && (dist > this->safezone * 2.0))
         {
             continue;
         }
+
         // Avoid to lost neighborn of the same type
         if ((I > 0) && (dist > this->sensing))
         {
-            return 10000;
+            return 1e9;
         }
 
-        Ust += this->coulombBuckinghamPotential(dist * 1.1, 0.04, 0.04, 0.8, 1.0, 16.0 * I, -1.0);
+        Ust += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 1.5, 50.0 * I, -1.0);
 
         // Get the sum of the relative velocity of all my neighbor and they mass
         if (I > 0 && (dist < this->sensing) && (dist > this->safezone))
@@ -690,7 +692,7 @@ double Controller::fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t)
         }
     }
     // Now compute the kinetic Energy using relative velocity
-    group_vrel = this->saturation(group_vrel, 1.0);
+    group_vrel = this->saturation(group_vrel, this->vmax);
     double group_speed = (group_vrel.x * group_vrel.x + group_vrel.y * group_vrel.y) + 1.0e-9;
     double my_speed = (v.x * v.x + v.y * v.y);
     // double group_speed = sqrt(group_vrel.x*group_vrel.x + group_vrel.y*group_vrel.y) + 1.0e-9;
@@ -1227,7 +1229,7 @@ Vector2 Controller::metropolisHastings(Robot r_i, std::vector<Robot> states_t)
     std::vector<double> chain_potential;
     chain_potential.push_back(
         this->fof_Us(r_i, r_i.velocity, obstacles) +
-        this->fof_Ut(r_i, r_i.velocity, objects) +
+        // this->fof_Ut(r_i, r_i.velocity, objects) +
         this->fof_Ust(r_i, r_i.velocity, states_t));
 
     // Random Seed for normal distribution
@@ -1251,7 +1253,7 @@ Vector2 Controller::metropolisHastings(Robot r_i, std::vector<Robot> states_t)
 
         // Compute the potential for the sampled velocity
         double U = this->fof_Us(r_i, sampled_vel, obstacles) +
-                   this->fof_Ut(r_i, sampled_vel, objects) +
+                   //    this->fof_Ut(r_i, sampled_vel, objects) +
                    this->fof_Ust(r_i, sampled_vel, states_t);
 
         // Accept the sampled velocity over the gibbs distribuition sampling
@@ -1350,9 +1352,6 @@ void Controller::update(long iterations)
         this->pub_target_vel_markers.publish(m_array);
     }
 
-#ifdef USE_OPENMP_
-#pragma omp parallel for ordered schedule(dynamic) // omp parallel for
-#endif
     for (int i = 0; i < this->robots; ++i)
     {
 #ifdef ROBOT_COLOR_STATE
@@ -1415,18 +1414,19 @@ void Controller::update(long iterations)
             err_ += 2.0 * M_PI;
 
         // Calculate linear and angular velocities based on the error
-        double velx = sqrt(pow(this->states[i].velocity.y, 2) + pow(this->states[i].velocity.x, 2)) * 2.0;
-
-        if (fabs(err_) > M_PI / 36.0)
-        {
-            v.linear.x = std::min(velx, 0.06);
-            v.angular.z = 1.0 * err_;
-        }
-        else
-        {
-            v.linear.x = std::min(velx, 0.12);
-            v.angular.z = 0.8 * err_;
-        }
+        double velx = sqrt(pow(this->states[i].velocity.y, 2) + pow(this->states[i].velocity.x, 2)) * 1.0;
+        v.linear.x = std::min(velx, this->vmax);
+        v.angular.z = 2.0*err_;
+        // if (fabs(err_) > M_PI / 36.0)
+        // {
+        //     v.linear.x = std::min(velx, 0.06);
+        //     v.angular.z = 1.0 * err_;
+        // }
+        // else
+        // {
+        //     v.linear.x = std::min(velx, 0.12);
+        //     v.angular.z = 0.8 * err_;
+        // }
 
         // Publish the velocity command if the system is running
         if (this->is_running)

@@ -1,17 +1,17 @@
 # Number of robots in the environment
 robots: 20
 # Number of groups of robots (not used)
-groups: 4
+groups: 2
 # Max sensing rance (m)
-sensing: 0.6 
+sensing: 0.5 
 # Max safe zone distance (m)
 safezone: 0.12
 # Control time interval (seconds)
-dt: 0.01
+dt: 0.5
 # Mass of the robot
-mass: 5.4
+mass: 10000
 # Max velocity of the robot (m/s)
-vmax: 0.3
+vmax: 0.06
 
 # Environment size (m) - (Need to be the same as state in the environment urdf file)
 worldsize: 4.00 #3.85
@@ -141,7 +141,7 @@ pub_obstacles_markers_topic: "/show_obstacles_rviz"
 pub_neighborns_markers_rviz: False
 pub_neighborns_markers_topic: "/show_neighborns_rviz"
 
-pub_target_vel_markers_rviz: False
+pub_target_vel_markers_rviz: True
 pub_target_vel_markers_topic: "/show_target_vel_rviz"
 
 # ROS parameters
