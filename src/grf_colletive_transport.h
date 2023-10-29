@@ -23,6 +23,8 @@
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
 #include <std_msgs/Float32.h>
+#include <std_srvs/Empty.h>
+
 
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -125,6 +127,8 @@ public:
     // WiseRobot Constructor
     Controller(ros::NodeHandle *nodehandle);
 
+    std::ofstream outputFile;
+
     // Robot parameters
     int robots = 10;
     int groups = 0;
@@ -161,6 +165,7 @@ public:
     boost::mutex mutex;
 
     void update(long iterations);
+    void resetSimulation();
 
 private:
     /* ROS Node Handle */
@@ -231,4 +236,7 @@ private:
     std::vector<std::vector<Robot>> getAllRobotsNeighborns(std::vector<Robot> agents);
     Vector2 saturation(Vector2 v, double norm);
     Vector2 metropolisHastings(Robot r_i, std::vector<Robot> states_t);
+
+    double consensusVelocity();
+    int clusterNumber(std::vector<Robot> states);
 };

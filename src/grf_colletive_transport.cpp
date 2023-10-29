@@ -635,9 +635,9 @@ double Controller::fof_Us(Robot r_i, Vector2 v, std::vector<Vector2> obstacles)
     {
         // lets compute the distance to the obstacle (we only use the distance)
         double dist = this->euclidean(r_i.position, obstacles[i]);
-        if (dist <= this->safezone*1.5)
+        if (dist <= this->safezone)
         {
-            Us += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 1.0, 50.0, 1.0);
+            Us += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 0.05, 1.0, 1.0);
         }
     }
 
@@ -661,7 +661,7 @@ double Controller::fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t)
     for (int i = 0; i < states_t.size(); ++i)
     {
         Vector2 neigborn_pos = {states_t[i].position.x + states_t[i].velocity.x * this->dt,
-                       states_t[i].position.y + states_t[i].velocity.y * this->dt};
+                                states_t[i].position.y + states_t[i].velocity.y * this->dt};
 
         double dist = this->euclidean(r_i.position, neigborn_pos);
 
@@ -678,10 +678,10 @@ double Controller::fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t)
         // Avoid to lost neighborn of the same type
         if ((I > 0) && (dist > this->sensing))
         {
-            return 1e9;
+            return 1e10;
         }
 
-        Ust += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 1.5, 50.0 * I, -1.0);
+        Ust += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 0.60, 50.0 * I, -1.0);
 
         // Get the sum of the relative velocity of all my neighbor and they mass
         if (I > 0 && (dist < this->sensing) && (dist > this->safezone))
@@ -1398,7 +1398,6 @@ void Controller::update(long iterations)
 #else
         this->setRobotColor(this->states[i], (int)this->states[i].type);
 #endif
-
         // Holonomic to differential driver controller
         geometry_msgs::Twist v;
 
@@ -1416,7 +1415,7 @@ void Controller::update(long iterations)
         // Calculate linear and angular velocities based on the error
         double velx = sqrt(pow(this->states[i].velocity.y, 2) + pow(this->states[i].velocity.x, 2)) * 1.0;
         v.linear.x = std::min(velx, this->vmax);
-        v.angular.z = 2.0*err_;
+        v.angular.z = 2.0 * err_;
         // if (fabs(err_) > M_PI / 36.0)
         // {
         //     v.linear.x = std::min(velx, 0.06);
@@ -1429,7 +1428,7 @@ void Controller::update(long iterations)
         // }
 
         // Publish the velocity command if the system is running
-        if (this->is_running)
+        if (this->is_running && !this->states[i].is_dead)
         {
             this->r_cmdvel_[i].publish(v);
         }
@@ -1438,8 +1437,84 @@ void Controller::update(long iterations)
             // If the system is not running, publish a stop command and log a message
             geometry_msgs::Twist vel;
             this->r_cmdvel_[i].publish(vel);
+            this->setRobotColor(this->states[i], 4);
             ROS_INFO_THROTTLE(1, "\33[91mRobots has stopped!\33[0m");
         }
+    }
+    this->logfile << ros::Time::now().toSec() << ", " << iterations << ", " << consensusVelocity() << ", " << clusterNumber(this->states) << std::endl;
+    // if (iterations > 2000){
+    //     this->states[0].is_dead = true;
+    // } else{
+    //     this->states[0].is_dead = false;
+    // }
+}
+
+double Controller::consensusVelocity(){
+    double overallVelNorm = 0;
+    double counter = 0;
+
+    for (int i = 0; i < this->robots; i++){
+        for (int j = 0; j < this->robots; j++){
+            if ((i == j) || (this->states[i].type != this->states[j].type) || (this->states[i].is_dead != this->states[j].is_dead)) continue;
+            double dist = this->euclidean(this->states[i].velocity, this->states[j].velocity);
+            overallVelNorm += dist;
+            counter++;
+        }
+    }
+    return overallVelNorm/counter;
+}
+
+int Controller::clusterNumber(std::vector<Robot> states){
+    std::vector<std::vector<Robot>> clusters;
+    std::vector<bool> visited(states.size(), false);
+
+    for (int i = 0; i < states.size(); i++) {
+        if (visited[i]) continue;
+
+        std::vector<Robot> cluster;
+        std::queue<int> queue;
+        queue.push(i);
+
+        while (!queue.empty()) {
+            int idx = queue.front();
+            queue.pop();
+
+            if (visited[idx]) continue;
+
+            cluster.push_back(states[idx]);
+            visited[idx] = true;
+
+            for (int j = 0; j < states.size(); j++) {
+                if (!visited[j] && states[idx].type == states[j].type) {
+                    double dist = this->euclidean(states[idx].position, states[j].position);
+
+                    if (dist <= this->sensing) {
+                        queue.push(j);
+                    }
+                }
+            }
+        }
+
+        clusters.push_back(cluster);
+    }
+
+    return (int)clusters.size();
+}
+
+
+void Controller::resetSimulation()
+{
+    ros::ServiceClient client = nh_.serviceClient<std_srvs::Empty>("/gazebo/reset_simulation");
+
+    std_srvs::Empty srv;
+
+    if (client.call(srv))
+    {
+        ROS_INFO("Reset simulation service called successfully");
+    }
+    else
+    {
+        ROS_ERROR("Failed to call reset simulation service");
     }
 }
 
@@ -1456,19 +1531,39 @@ int main(int argc, char **argv)
     ROS_INFO("[Main] Instantiating an object of type Controller");
     Controller control(&nh);
 
+    uint64_t trial = 0;
+    std::string filename = "consensus_data" + std::to_string(trial);
+    control.logfile = std::ofstream(filename+".txt", std::ios::app); // Open file in append mode
+    control.resetSimulation();
+
     ros::Rate rate(10);
     uint64_t iterations = 0;
     ROS_INFO("[Main] Starting Controller");
     while (ros::ok())
     {
         auto t1 = std::chrono::high_resolution_clock::now();
-        control.update(0);
+        control.update(iterations);
         auto t2 = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
         ROS_INFO_THROTTLE(1, "Loop-time at %f ms", (float)duration * 0.001);
         iterations++;
+        if (iterations > 6000)
+        {
+            iterations = 0;
+            trial++;
+            control.logfile.close();
+            filename = "consensus_data" + std::to_string(trial);
+            control.logfile = std::ofstream(filename+".txt", std::ios::app); // Open file in append mode
+            control.resetSimulation();
+        }
+        if (trial > 100)
+        {
+            ROS_INFO("[Main] Starting Trials %ld", trial);
+            break;
+        }
         ros::spinOnce();
         rate.sleep();
     }
+    control.logfile.close();
     return 0;
 }
