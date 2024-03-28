@@ -1,7 +1,7 @@
 <launch>
 	<param name="/robot_description" textfile="$(find hero_description)/robot/hero_light.urdf"/>
 		
-	<node name="spawn_urdf_arena_1" pkg="gazebo_ros" type="spawn_model" args="-urdf -model arena_1 -x 0.0 -y -0.0 -z 0.0 -file $(find hero_gazebo)/worlds/models/arena_1/arena.urdf" />
+	<node name="spawn_urdf_arena_0" pkg="gazebo_ros" type="spawn_model" args="-urdf -model arena_0 -x 0.0 -y -0.0 -z 0.0 -file $(find hero_gazebo)/worlds/models/arena_0/arena.urdf" />
 
 	<node name="spawn_urdf_hero_0" pkg="gazebo_ros" type="spawn_model" args="-urdf -model hero_0 -x -0.3162 -y -0.3162 -z 0.575 -robot_namespace hero_0 -file $(find hero_description)/robot/hero_light.urdf" />
 	<node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher_hero_0">

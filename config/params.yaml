@@ -1,11 +1,11 @@
 # Number of robots in the environment
-robots: 20
+robots: 10
 # Number of groups of robots (not used)
 groups: 1
 # Max sensing rance (m)
 sensing: 0.5
 # Max safe zone distance (m)
-safezone: 0.12
+safezone: 0.15
 # Control time interval (seconds)
 dt: 0.5
 # Mass of the robot
@@ -17,13 +17,13 @@ vmax: 0.06
 worldsize: 4.00 #3.85
 
 # Visual debug RViz
-pub_object_state_rviz: False
+pub_object_state_rviz: True
 pub_object_state_topic: "/object_state"
 
-pub_gradient_object_rviz: False
+pub_gradient_object_rviz: True
 pub_gradient_object_topic: "/show_gradient_object_rviz"
 
-pub_objects_markers_rviz: False
+pub_objects_markers_rviz: True
 pub_objects_markers_topic: "/show_objects_rviz"
 
 pub_obstacles_markers_rviz: False
