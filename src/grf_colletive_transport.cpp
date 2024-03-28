@@ -116,6 +116,7 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
     Body obstacle_;
     obstacle_.cm_position = Vector2(0.0, 0.0);
     obstacle_.is_obstacle = true;
+    obstacle_.type = "obstacle";
     obstacle_.name = this->environment_name;
 
     XmlRpc::XmlRpcValue environment_coordinates;
@@ -150,6 +151,7 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
     Body object_;
     object_.cm_position = Vector2(100.0, -100.0);
     object_.is_obstacle = false;
+    object_.type = "object";
     object_.name = this->object_shape;
 
     XmlRpc::XmlRpcValue object_coordinates;
@@ -184,6 +186,7 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
     this->targets_id = 0;
     object_.name = std::string("target_") + this->object_shape;
     object_.is_obstacle = false;
+    object_.type = "target";
     this->bodies_state.push_back(object_);
 
     // this->targets_name.push_back("rectangle_prism_goal_0");
@@ -1051,7 +1054,7 @@ std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
         Vector2 beam_point{r.position.x + laser_range * cos(step + r.theta),
                            r.position.y + laser_range * sin(step + r.theta)};
 
-        Vector2 closest_point = this->getClosestIntersectionPoint(LineStruct(r.position, beam_point), false);
+        Vector2 closest_point = this->getClosestIntersectionPoint(LineStruct(r.position, beam_point), std::string("object"));
 
         double dist = this->euclidean(r.position, closest_point);
         if (dist < laser_range)
@@ -1101,14 +1104,14 @@ std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
     return object_points;
 }
 
-Vector2 Controller::getClosestIntersectionPoint(LineStruct line, bool is_obstacle)
+Vector2 Controller::getClosestIntersectionPoint(LineStruct line, std::string body_type)
 {
     double min_dist = DBL_MAX;
     Vector2 closest_point = {DBL_MAX, DBL_MAX};
 
     for (const auto &body_state : this->bodies_state)
     {
-        if ((body_state.is_obstacle != is_obstacle) || (body_state.name.find("target") != std::string::npos))
+        if (body_state.type != body_type)
         {
             continue;
         }
@@ -1143,7 +1146,7 @@ std::vector<Vector2> Controller::getObstaclesPoints(double sensing, Robot r)
         Vector2 beam_point{r.position.x + laser_range * cos(step + r.theta),
                            r.position.y + laser_range * sin(step + r.theta)};
 
-        Vector2 closest_point = this->getClosestIntersectionPoint(LineStruct(r.position, beam_point), true);
+        Vector2 closest_point = this->getClosestIntersectionPoint(LineStruct(r.position, beam_point), std::string("obstacle"));
 
         double dist = this->euclidean(r.position, closest_point);
         if (dist < laser_range)

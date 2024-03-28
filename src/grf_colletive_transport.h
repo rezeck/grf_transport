@@ -113,6 +113,7 @@ class Body
 {
 public:
     std::string name;
+    std::string type;
     Vector2 cm_position;
     geometry_msgs::Quaternion cm_orientation;
     std::vector<LineStruct> global_lines;
@@ -228,7 +229,7 @@ private:
     bool doIntersect(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2);
     bool doIntersectWithObstacle(Vector2 p1, Vector2 q1);
     bool getSegmentIntersection(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2, Vector2 &out);
-    Vector2 getClosestIntersectionPoint(LineStruct line, bool is_obstacle);
+    Vector2 getClosestIntersectionPoint(LineStruct line, std::string body_type);
 
     double targetOcclusion(Robot robot, std::vector<Vector2> objects);
     bool goCWise(Robot robot, std::vector<Vector2> objects);
