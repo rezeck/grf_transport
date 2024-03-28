@@ -135,8 +135,8 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
             XmlRpc::XmlRpcValue line = environment_coordinates[i];
             if (line.size() == 4)
             {
-                Vector2 start(double(line[0]) * this->worldsize, double(line[1]) * this->worldsize);
-                Vector2 end(double(line[2]) * this->worldsize, double(line[3]) * this->worldsize);
+                Vector2 start(double(line[0]) * this->scale_x, double(line[1]) * this->scale_y);
+                Vector2 end(double(line[2]) * this->scale_x, double(line[3]) * this->scale_y);
                 LineStruct line(start, end);
                 ROS_INFO("Setting obstacle lines: (%f, %f, %f, %f)", start.x, start.y, end.x, end.y);
                 obstacle_.local_lines.push_back(line);
@@ -168,15 +168,15 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
             XmlRpc::XmlRpcValue line = object_coordinates[i];
             if (line.size() == 4)
             {
-                Vector2 start(double(line[0]) * this->worldsize, double(line[1]) * this->worldsize);
-                Vector2 end(double(line[2]) * this->worldsize, double(line[3]) * this->worldsize);
+                Vector2 start(double(line[0]) * this->scale_x, double(line[1]) * this->scale_y);
+                Vector2 end(double(line[2]) * this->scale_x, double(line[3]) * this->scale_y);
                 LineStruct line(start, end);
                 ROS_INFO("Setting object lines: (%f, %f, %f, %f)", start.x, start.y, end.x, end.y);
                 object_.local_lines.push_back(line);
             }
         }
 
-        object_.global_lines = object_.global_lines;
+        object_.global_lines = object_.local_lines;
         this->bodies_state.push_back(object_);
     }
 
@@ -517,6 +517,10 @@ double Controller::coulombBuckinghamPotential(double r, double eplson, double ep
 
 double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects1)
 {
+    if (this->object_shape.empty())
+    {
+        return 0.0;
+    }
     if (this->pub_gradient_object_rviz)
     {
         visualization_msgs::Marker m;
@@ -559,12 +563,12 @@ double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects1)
         // Ut += this->coulombBuckinghamPotential(dist_i * 1.5, 0.04, 0.04, 0.8, 1.0, -32.0, 1.0);
         if (factor >= 5)
         {
-            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -8000000.0, 1.0);
+            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 0.6, -8000000.0, 1.0);
             return Ut;
         }
         else
         {
-            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 1.0, -32.0, 1.0);
+            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 0.6, -50.0, 1.0);
         }
 
         if (dist_j >= this->sensing)
@@ -681,7 +685,7 @@ double Controller::fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t)
             return 1e10;
         }
 
-        Ust += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 0.60, 50.0 * I, -1.0);
+        Ust += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 0.60, 46.0 * I, -1.0);
 
         // Get the sum of the relative velocity of all my neighbor and they mass
         if (I > 0 && (dist < this->sensing) && (dist > this->safezone))
@@ -1104,7 +1108,7 @@ Vector2 Controller::getClosestIntersectionPoint(LineStruct line, bool is_obstacl
 
     for (const auto &body_state : this->bodies_state)
     {
-        if ((body_state.is_obstacle != is_obstacle) && (body_state.name.find("goal") == std::string::npos))
+        if ((body_state.is_obstacle != is_obstacle) || (body_state.name.find("target") != std::string::npos))
         {
             continue;
         }
@@ -1229,7 +1233,7 @@ Vector2 Controller::metropolisHastings(Robot r_i, std::vector<Robot> states_t)
     std::vector<double> chain_potential;
     chain_potential.push_back(
         this->fof_Us(r_i, r_i.velocity, obstacles) +
-        // this->fof_Ut(r_i, r_i.velocity, objects) +
+        this->fof_Ut(r_i, r_i.velocity, objects) +
         this->fof_Ust(r_i, r_i.velocity, states_t));
 
     // Random Seed for normal distribution
@@ -1253,7 +1257,7 @@ Vector2 Controller::metropolisHastings(Robot r_i, std::vector<Robot> states_t)
 
         // Compute the potential for the sampled velocity
         double U = this->fof_Us(r_i, sampled_vel, obstacles) +
-                   //    this->fof_Ut(r_i, sampled_vel, objects) +
+                      this->fof_Ut(r_i, sampled_vel, objects) +
                    this->fof_Ust(r_i, sampled_vel, states_t);
 
         // Accept the sampled velocity over the gibbs distribuition sampling
@@ -1449,46 +1453,58 @@ void Controller::update(long iterations)
     // }
 }
 
-double Controller::consensusVelocity(){
+double Controller::consensusVelocity()
+{
     double overallVelNorm = 0;
     double counter = 0;
 
-    for (int i = 0; i < this->robots; i++){
-        for (int j = 0; j < this->robots; j++){
-            if ((i == j) || (this->states[i].type != this->states[j].type) || (this->states[i].is_dead != this->states[j].is_dead)) continue;
+    for (int i = 0; i < this->robots; i++)
+    {
+        for (int j = 0; j < this->robots; j++)
+        {
+            if ((i == j) || (this->states[i].type != this->states[j].type) || (this->states[i].is_dead != this->states[j].is_dead))
+                continue;
             double dist = this->euclidean(this->states[i].velocity, this->states[j].velocity);
             overallVelNorm += dist;
             counter++;
         }
     }
-    return overallVelNorm/counter;
+    return overallVelNorm / counter;
 }
 
-int Controller::clusterNumber(std::vector<Robot> states){
+int Controller::clusterNumber(std::vector<Robot> states)
+{
     std::vector<std::vector<Robot>> clusters;
     std::vector<bool> visited(states.size(), false);
 
-    for (int i = 0; i < states.size(); i++) {
-        if (visited[i]) continue;
+    for (int i = 0; i < states.size(); i++)
+    {
+        if (visited[i])
+            continue;
 
         std::vector<Robot> cluster;
         std::queue<int> queue;
         queue.push(i);
 
-        while (!queue.empty()) {
+        while (!queue.empty())
+        {
             int idx = queue.front();
             queue.pop();
 
-            if (visited[idx]) continue;
+            if (visited[idx])
+                continue;
 
             cluster.push_back(states[idx]);
             visited[idx] = true;
 
-            for (int j = 0; j < states.size(); j++) {
-                if (!visited[j] && states[idx].type == states[j].type) {
+            for (int j = 0; j < states.size(); j++)
+            {
+                if (!visited[j] && states[idx].type == states[j].type)
+                {
                     double dist = this->euclidean(states[idx].position, states[j].position);
 
-                    if (dist <= this->sensing) {
+                    if (dist <= this->sensing)
+                    {
                         queue.push(j);
                     }
                 }
@@ -1500,7 +1516,6 @@ int Controller::clusterNumber(std::vector<Robot> states){
 
     return (int)clusters.size();
 }
-
 
 void Controller::resetSimulation()
 {
@@ -1533,7 +1548,7 @@ int main(int argc, char **argv)
 
     uint64_t trial = 0;
     std::string filename = "consensus_data" + std::to_string(trial);
-    control.logfile = std::ofstream(filename+".txt", std::ios::app); // Open file in append mode
+    control.logfile = std::ofstream(filename + ".txt", std::ios::app); // Open file in append mode
     control.resetSimulation();
 
     ros::Rate rate(10);
@@ -1546,21 +1561,21 @@ int main(int argc, char **argv)
         auto t2 = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
         ROS_INFO_THROTTLE(1, "Loop-time at %f ms", (float)duration * 0.001);
-        iterations++;
-        if (iterations > 6000)
-        {
-            iterations = 0;
-            trial++;
-            control.logfile.close();
-            filename = "consensus_data" + std::to_string(trial);
-            control.logfile = std::ofstream(filename+".txt", std::ios::app); // Open file in append mode
-            control.resetSimulation();
-        }
-        if (trial > 100)
-        {
-            ROS_INFO("[Main] Starting Trials %ld", trial);
-            break;
-        }
+        // iterations++;
+        // if (iterations > 6000)
+        // {
+        //     iterations = 0;
+        //     trial++;
+        //     control.logfile.close();
+        //     filename = "consensus_data" + std::to_string(trial);
+        //     control.logfile = std::ofstream(filename+".txt", std::ios::app); // Open file in append mode
+        //     control.resetSimulation();
+        // }
+        // if (trial > 100)
+        // {
+        //     ROS_INFO("[Main] Starting Trials %ld", trial);
+        //     break;
+        // }
         ros::spinOnce();
         rate.sleep();
     }
