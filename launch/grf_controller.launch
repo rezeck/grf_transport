@@ -1,7 +1,7 @@
 <launch>
     <!-- Arena -->
     <!-- Select proper arena: arena0, arena2, arena5,arena6, arena7 -->
-    <rosparam command="load" file="$(find grf_transport)/config/arena0.yaml" /> 
+    <rosparam command="load" file="$(find grf_transport)/config/arena_verlab.yaml" /> 
     
     <!-- GRF Params -->
     <rosparam command="load" file="$(find grf_transport)/config/params.yaml" />

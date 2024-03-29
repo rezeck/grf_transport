@@ -122,12 +122,11 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
     this->target.y = 1.07071220875;
 
     this->target.x = -1.47929775715;
-    this->target.y  = 1.0065485239;
+    this->target.y = 1.0065485239;
 
     /* Experiments with real heros robots */
     this->target.x = 5.01836409232;
     this->target.y = 5.59045445478;
-
 }
 /*********************************/
 /*        END OF CONSTRUCTOR         */
@@ -158,7 +157,7 @@ void Controller::gz_poses_cb(const geometry_msgs::Pose2DConstPtr &msg)
     if (dist < 4)
     {
         data.x = dist;
-        double vel = 0; //sqrt(msg->twist[i].linear.x * msg->twist[i].linear.x + msg->twist[i].linear.y * msg->twist[i].linear.y) * 100;
+        double vel = 0; // sqrt(msg->twist[i].linear.x * msg->twist[i].linear.x + msg->twist[i].linear.y * msg->twist[i].linear.y) * 100;
         double gain = 0.05;
         data.y = data.y * (1.0f - gain) + vel * (gain);
         this->publish_object_state.publish(data);
@@ -936,7 +935,7 @@ bool Controller::doIntersect(Vector2 p1, Vector2 q1, Vector2 p2, Vector2 q2)
 std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
 {
     // Get object points
-    double laser_res = LASER_RESOLUTION; //0.02;
+    double laser_res = LASER_RESOLUTION; // 0.02;
     double laser_range = sensing;
     std::vector<Vector2> object_points;
     for (double step = 0; step < (M_PI * 2.0); step += laser_res)
@@ -1143,28 +1142,27 @@ Vector2 Controller::metropolisHastings(Robot r_i, std::vector<Robot> states_t)
     for (int i = 0; i < 100; i++)
     {
         // Get the last potential simulated
-        Vector2 last_v;
-        last_v.x = mcmc_chain.back().x;
-        last_v.y = mcmc_chain.back().y;
+        Vector2 last_v = mcmc_chain.back();
         double last_U = chain_potential.back();
+
         // Get a sample of velocity considering normal distribution
-        // std::normal_distribution<double> norm_vx(r_i.type - r_i.position.x, 0.2);
-        // std::normal_distribution<double> norm_vy(r_i.type - r_i.position.y, 0.2);
         std::normal_distribution<double> norm_vx(r_i.velocity.x, 0.05);
         std::normal_distribution<double> norm_vy(r_i.velocity.y, 0.05);
-        Vector2 sampled_vel;
-        sampled_vel.x = norm_vx(generator_x);
-        sampled_vel.y = norm_vy(generator_y);
+
+        Vector2 sampled_vel = {norm_vx(generator_x), norm_vy(generator_y)};
         sampled_vel = this->saturation(sampled_vel, this->vmax);
+
         // Compute the potential for the sampled velocity
         double U = this->fof_Us(r_i, sampled_vel) +
                    this->fof_Ut(r_i, sampled_vel, objects) +
                    this->fof_Ust(r_i, sampled_vel, states_t);
+
         // Accept the sampled velocity over the gibbs distribuition sampling
         double dE = U - last_U;
         double grf = exp(-dE);
         double r = ((double)rand() / ((double)(RAND_MAX) + (double)(1)));
-        if ((dE < 0.0) || (r < grf))
+
+        if (dE < 0.0 || r < grf)
         {
             mcmc_chain.push_back(sampled_vel);
             chain_potential.push_back(U);
@@ -1311,12 +1309,12 @@ void Controller::update(long iterations)
         if (abs(err_) > M_PI / 36.0)
         {
             v.linear.x = std::max(std::min(velx, 0.045), 0.045);
-            v.angular.z = 3.6 * err_/3.0;
+            v.angular.z = 3.6 * err_ / 3.0;
         }
         else
         {
             v.linear.x = std::max(std::min(velx, 0.075), 0.045);
-            v.angular.z = 1.4 * err_/3.0;
+            v.angular.z = 1.4 * err_ / 3.0;
         }
         if (this->is_running)
         {
