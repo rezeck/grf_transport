@@ -7,24 +7,16 @@ sensing: 0.5
 # Max safe zone distance (m)
 safezone: 0.15
 # Control time interval (seconds)
-dt: 0.01
+dt: 0.5
 # Mass of the robot
-mass: 5.0
+mass: 8000
 # Max velocity of the robot (m/s)
-vmax: 0.3
+vmax: 0.06
 
 # Environment size (m) - (Need to be the same as state in the environment urdf file)
-worldsize: 3.85
-# Environment name
-environment_name: 'arena_1'
-environment_coordinates_x: [-0.5, 0.5, 0.5, -0.5]
-environment_coordinates_y: [-0.5, -0.5, 0.5, 0.5]
+worldsize: 4.00 #3.85
 
-# environment_name: 'arena_4'
-# environment_coordinates_x: [0.44871794871794873, 0.1730769230769231, 0.1730769230769231, 0.16025641025641027, 0.16025641025641027, -0.44871794871794873, -0.5, -0.5, -0.44871794871794873, -0.1730769230769231, -0.1730769230769231, -0.16025641025641027, -0.16025641025641027, 0.44871794871794873, 0.5, 0.5]
-# environment_coordinates_y: [-0.5, -0.5, 0.0, 0.0, -0.5, -0.5, -0.44871794871794873, 0.44871794871794873, 0.5, 0.5, 0.0, 0.0, 0.5, 0.5, 0.44871794871794873, -0.44871794871794873]
-
-# Visual debug RViz 
+# Visual debug RViz
 pub_object_state_rviz: False
 pub_object_state_topic: "/object_state"
 
@@ -44,8 +36,8 @@ pub_target_vel_markers_rviz: True
 pub_target_vel_markers_topic: "/show_target_vel_rviz"
 
 # ROS parameters
-cmd_vel_topic: '/cmd_vel'
-odom_topic: '/odom'
-led_topic: '/led'
-model_state_topic: '/gazebo/model_states'
-set_model_state_topic: '/gazebo/set_model_states'
+cmd_vel_topic: "/cmd_vel"
+odom_topic: "/odom"
+led_topic: "/led"
+model_state_topic: "/gazebo/model_states"
+set_model_state_topic: "/gazebo/set_model_states"

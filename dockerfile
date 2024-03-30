@@ -4,6 +4,7 @@ FROM ros:noetic
 RUN apt-get update && apt-get install -y \
       git \
       nano \
+      byobu \
       qt5-default \
       python3-pyqt5 \
       ros-${ROS_DISTRO}-robot-state-publisher \
@@ -13,9 +14,13 @@ RUN apt-get update && apt-get install -y \
       ros-${ROS_DISTRO}-rosserial \
       ros-${ROS_DISTRO}-rosserial-server \
       ros-${ROS_DISTRO}-urdf \
+      ros-${ROS_DISTRO}-rqt \
+      ros-${ROS_DISTRO}-rqt-plot \
+      ros-${ROS_DISTRO}-rqt-ez-publisher \
+      ros-${ROS_DISTRO}-rqt-rviz \
+      ros-${ROS_DISTRO}-map-server \
       ros-${ROS_DISTRO}-teleop-twist-keyboard \
-      ros-${ROS_DISTRO}-rviz \
-      ros-${ROS_DISTRO}-gazebo-ros-pkgs \
+      ros-${ROS_DISTRO}-gazebo-ros-pkgs \ 
       ros-${ROS_DISTRO}-gazebo-plugins \
       ros-${ROS_DISTRO}-gazebo-ros-control && \
     rm -rf /var/lib/apt/lists/*

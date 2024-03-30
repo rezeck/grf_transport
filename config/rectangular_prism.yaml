@@ -8,18 +8,15 @@
 #          |                                       |
 #          +----------------------------+
 #          P_1                               P_2
-#
-object_coordinates_x: [-0.20, 0.20, 0.20, -0.20]
-object_coordinates_y: [-0.20, -0.20, 0.20, 0.20]
+# 
+object_coordinates:
+  [
+    [-0.20, -0.20, 0.20, -0.20],
+    [0.20, -0.20, 0.20, 0.20],
+    [0.20, 0.20, -0.20, 0.20],
+    [-0.20, 0.20, -0.20, -0.20],
+  ]
 
 # Object Scale (Need to be the same as state in the object urdf file)
-scale_x: 0.98
-scale_y: 0.98
-# scale_x: 1.259320
-# scale_y: 1.007450
-# scale_x: 0.8
-# scale_y: 0.8
-# scale_x: 2.4
-# scale_y: 2.4
-# scale_x: 2.51864
-# scale_y: 2.0149
+scale_x: 1.0
+scale_y: 1.0

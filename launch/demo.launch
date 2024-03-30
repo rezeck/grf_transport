@@ -1,0 +1,13 @@
+<launch>
+    <!-- Launch gazebo_bringup.launch -->
+    <include file="$(find grf_transport)/launch/gazebo_bringup.launch"/>
+
+    <!-- Launch spawn_object.launch -->
+    <include file="$(find grf_transport)/launch/spawn_object.launch"/>
+
+    <!-- Launch spawn_robots.launch -->
+    <include file="$(find grf_transport)/launch/spawn_robots.launch"/>
+
+    <!-- Launch grf_controller.launch -->
+    <include file="$(find grf_transport)/launch/grf_controller.launch"/>
+</launch>

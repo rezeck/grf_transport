@@ -15,10 +15,8 @@
     <arg name="paused" value="true"/>
     <arg name="use_sim_time" value="$(arg use_sim_time)" />
     <arg name="physics" default="ode" />
-    <arg name="world_name" value="$(find hero_gazebo)/worlds/hero.world" />
+    <arg name="world_name" value="$(find grf_transport)/worlds/hero.world" />
     <!-- more default parameters can be changed here -->
   </include>
-
-  <!-- <param name="/robot_description" textfile="$(find hero_description)/robot/hero.urdf"/> -->
 
 </launch>
