@@ -8,7 +8,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
-        <mesh filename="package://grf_transport/models/cylinder_prism/cylinder_prism.stl" scale="1.0 1.0 1.0" />
+        <mesh filename="package://grf_transport/models/cylinder_prism/cylinder_prism.stl" scale="1.0 1.0 0.05" />
       </geometry>
     </visual>
     <inertial>

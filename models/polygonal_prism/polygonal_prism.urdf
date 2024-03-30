@@ -28,8 +28,8 @@
     <!-- <gravity>false</gravity> -->
     <selfCollide>true</selfCollide>
     <material>Gazebo/Orange</material>
-    <mu1>0.3</mu1>
-    <mu2>0.2</mu2>
+    <mu1>0.95</mu1>
+    <mu2>0.85</mu2>
     <laserRetro>1.0</laserRetro>
   </gazebo>
 </robot>
