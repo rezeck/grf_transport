@@ -208,8 +208,8 @@ private:
     // ros::Publisher publish_goal_state;
     // Publish object pose
 
-    std_msgs::ColorRGBA getColorByType(uint8_t type);
     void setRobotColor(Robot robot, int colorId);
+    cv::Scalar colormap_jet(float value);
 
     std::vector<geometry_msgs::Pose2D> global_poses;
     std::vector<geometry_msgs::Twist> global_velocities;

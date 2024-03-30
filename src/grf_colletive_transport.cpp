@@ -330,181 +330,45 @@ void Controller::r_pose_cb(const nav_msgs::OdometryConstPtr &msg, const std::str
 /*********************************/
 void Controller::setRobotColor(Robot robot, int colorId)
 {
-    std_msgs::ColorRGBA color = this->getColorByType(colorId);
     std_msgs::ColorRGBA color_;
-    color_.a = color.a / 255.0;
-    color_.r = color.r / 255.0;
-    color_.g = color.g / 255.0;
-    color_.b = color.b / 255.0;
+    color_.a = 1.0;
+
+    if (colorId < 0) {
+        color_.r = 1.0;
+        color_.g = 1.0;
+        color_.b = 1.0;
+    } else {
+        // Obtain RGB color from colormap_jet function
+        cv::Scalar rgb = this->colormap_jet(static_cast<float>(colorId) / static_cast<float>(this->robots));
+
+        // Convert RGB color to std_msgs::ColorRGBA
+        color_.r = rgb[2] / 255.0;
+        color_.g = rgb[1] / 255.0;
+        color_.b = rgb[0] / 255.0;
+    }
+
+    // Publish the color message
     this->r_cmdcolor_[(int)robot.id].publish(color_);
 }
 
-std_msgs::ColorRGBA Controller::getColorByType(uint8_t type)
+cv::Scalar Controller::colormap_jet(float value)
 {
-    std_msgs::ColorRGBA color;
-    color.a = 255.0;
-    switch (type)
-    { // BGR
-    case 0:
-        color.r = 0;
-        color.g = 100;
-        color.b = 245;
-        break; // maroon
-    case 1:
-        color.r = 180;
-        color.g = 0;
-        color.b = 0;
-        break; // dark slate gray
-    case 2:
-        color.r = 0;
-        color.g = 128;
-        color.b = 0;
-        break; // blue violet
-    case 3:
-        color.r = 199;
-        color.g = 21;
-        color.b = 133;
-        break; // medium violet red
-    case 4:
-        // color.r = 144;
-        // color.g = 238;
-        // color.b = 144;
-        color.r = 180;
-        color.g = 180;
-        color.b = 180;
-        break; // light green
-    case 5:
-        color.r = 255;
-        color.g = 215;
-        color.b = 0;
-        break; // gold
-    case 6:
-        color.r = 218;
-        color.g = 165;
-        color.b = 32;
-        break; // golden rod
-    case 7:
-        color.r = 189;
-        color.g = 183;
-        color.b = 107;
-        break; // dark khaki
-    case 8:
-        color.r = 128;
-        color.g = 128;
-        color.b = 0;
-        break; // olive
-    case 9:
-        color.r = 154;
-        color.g = 205;
-        color.b = 50;
-        break; // yellow green
-    case 10:
-        color.r = 107;
-        color.g = 142;
-        color.b = 35;
-        break; // olive drab
-    case 11:
-        color.r = 127;
-        color.g = 255;
-        color.b = 0;
-        break; // chart reuse
-    case 12:
-        color.r = 0;
-        color.g = 100;
-        color.b = 0;
-        break; // dark green
-    case 13:
-        color.r = 255;
-        color.g = 140;
-        color.b = 0;
-        break; // dark orange
-    case 14:
-        color.r = 46;
-        color.g = 139;
-        color.b = 87;
-        break; // sea green
-    case 15:
-        color.r = 102;
-        color.g = 205;
-        color.b = 170;
-        break; // medium aqua marine
-    case 16:
-        color.r = 220;
-        color.g = 20;
-        color.b = 60;
-        break; // crimson
-    case 17:
-        color.r = 0;
-        color.g = 139;
-        color.b = 139;
-        break; // dark cyan
-    case 18:
-        color.r = 0;
-        color.g = 255;
-        color.b = 255;
-        break; // cyan
-    case 19:
-        color.r = 70;
-        color.g = 130;
-        color.b = 180;
-        break; // steel blue
-    case 20:
-        color.r = 100;
-        color.g = 149;
-        color.b = 237;
-        break; // corn flower blue
-    case 21:
-        color.r = 30;
-        color.g = 144;
-        color.b = 255;
-        break; // dodger blue
-    case 22:
-        color.r = 0;
-        color.g = 0;
-        color.b = 128;
-        break; // navy
-    case 23:
-        color.r = 240;
-        color.g = 128;
-        color.b = 128;
-        break; // light coral
-    case 24:
-        color.r = 75;
-        color.g = 0;
-        color.b = 130;
-        break; // indigo
-    case 25:
-        color.r = 139;
-        color.g = 0;
-        color.b = 139;
-        break; // dark magenta
-    case 26:
-        color.r = 238;
-        color.g = 130;
-        color.b = 238;
-        break; // violet
-    case 27:
-        color.r = 255;
-        color.g = 160;
-        color.b = 122;
-        break; // light salmon
-    case 28:
-        color.r = 255;
-        color.g = 105;
-        color.b = 180;
-        break; // hot pink
-    case 29:
-        color.r = 112;
-        color.g = 128;
-        color.b = 144;
-        break; // slate gray
-    default:
-        color.r = 0;
-        color.g = 128;
-        color.b = 240;
-        break; // black
-    }
-    return color;
+    // Ensure value is within the range [0, 1]
+    value = std::max(0.0f, std::min(value, 1.0f));
+
+    // Create a single pixel image with the specified value
+    cv::Mat image(1, 1, CV_8UC1, cv::Scalar(value * 255));
+
+    // Apply COLORMAP_JET colormap
+    cv::Mat colormap;
+    cv::applyColorMap(image, colormap, cv::COLORMAP_JET);
+
+    // Retrieve the color of the single pixel
+    cv::Vec3b color = colormap.at<cv::Vec3b>(0, 0);
+
+    // Convert color to Scalar (BGR format)
+    cv::Scalar scalar_color(color[0], color[1], color[2]);
+    return scalar_color;
 }
 
 double Controller::kineticEnergy(double v, double m)
@@ -548,25 +412,25 @@ double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects)
     Vector2 object_contour_grad(0.0, 0.0);
     for (int i = 0; i < (objects.size() - 1); i++)
     {
-        double dist_i = this->euclidean(r_i.position, objects[i]);
-        double dist_j = this->euclidean(r_i.position, objects[(i + 1) % objects.size()]);
-        if (dist_i >= this->sensing)
+        const Vector2 &object_i = objects[i];
+        const Vector2 &object_j = objects[(i + 1) % objects.size()];
+
+        double dist_i = this->euclidean(r_i.position, object_i);
+        double dist_j = this->euclidean(r_i.position, object_j);
+
+        if (dist_i >= this->sensing || dist_j >= this->sensing)
         {
-            continue;
+            return 1e3;
         }
+
         if (factor >= 5)
         {
-            Ut += this->coulombBuckinghamPotential(dist_i, 0.04, 0.04, 0.8, 0.6, 8000000.0, -1.0);
+            Ut += this->coulombBuckinghamPotential(dist_i, 0.04, 0.04, 0.8, 0.2, 8000000.0, -1.0);
             return Ut;
         }
         else
         {
-            Ut += this->coulombBuckinghamPotential(dist_i, 0.04, 0.04, 0.8, 0.6, 40000.0, -1.0);
-        }
-
-        if (dist_j >= this->sensing)
-        {
-            continue;
+            Ut += this->coulombBuckinghamPotential(dist_i, 0.04, 0.04, 0.8, 0.2, 100.0, -1.0);
         }
 
         Vector2 dV;
@@ -584,7 +448,7 @@ double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects)
         object_contour_grad.x += (dV.x - v.x);
         object_contour_grad.y += (dV.y - v.y);
 
-        object_mass += 100.0 * this->mass;
+        object_mass += 0.01 * this->mass;
 
         if (this->pub_gradient_object_rviz)
         {
@@ -684,10 +548,10 @@ double Controller::fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t)
         // Avoid to lost neighborn of the same type
         if ((I > 0) && (dist > this->sensing))
         {
-            return 1e10;
+            return 1e3;
         }
 
-        Ust += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 0.60, 46.0 * I, -1.0);
+        Ust += this->coulombBuckinghamPotential(dist, 0.04, 0.04, 0.8, 0.65, 50.0 * I, -1.0);
 
         // Get the sum of the relative velocity of all my neighbor and they mass
         if (I > 0 && (dist < this->sensing) && (dist > this->safezone))
@@ -1368,14 +1232,15 @@ void Controller::update(long iterations)
             for (uint8_t k = 0; k < objects.size(); k++)
             {
                 double mdist = this->euclidean(objects[k], this->states[i].position);
-                if ((state_color == 0) && (mdist < this->sensing))
+                if ((state_color >= 0) && (mdist < this->sensing))
                 {
-                    state_color = 1;
-                }
-                if ((state_color == 1) && (mdist < 0.06))
-                {
-                    state_color = 2;
-                    break;
+                    state_color = (int)(0.5 * this->robots);
+
+                    if (mdist < 0.06)
+                    {
+                        state_color = this->robots;
+                        break;
+                    }
                 }
             }
             this->setRobotColor(this->states[i], (int)state_color);
@@ -1397,7 +1262,7 @@ void Controller::update(long iterations)
         }
         if (this->states[i].is_dead)
         {
-            this->setRobotColor(this->states[i], 4);
+            this->setRobotColor(this->states[i], -1);
             continue;
         }
 #endif
@@ -1420,16 +1285,6 @@ void Controller::update(long iterations)
         double velx = sqrt(pow(this->states[i].velocity.y, 2) + pow(this->states[i].velocity.x, 2)) * 1.0;
         v.linear.x = std::min(velx, this->vmax);
         v.angular.z = 2.0 * err_;
-        // if (fabs(err_) > M_PI / 36.0)
-        // {
-        //     v.linear.x = std::min(velx, 0.06);
-        //     v.angular.z = 1.0 * err_;
-        // }
-        // else
-        // {
-        //     v.linear.x = std::min(velx, 0.12);
-        //     v.angular.z = 0.8 * err_;
-        // }
 
         // Publish the velocity command if the system is running
         if (this->is_running && !this->states[i].is_dead)
@@ -1441,7 +1296,7 @@ void Controller::update(long iterations)
             // If the system is not running, publish a stop command and log a message
             geometry_msgs::Twist vel;
             this->r_cmdvel_[i].publish(vel);
-            this->setRobotColor(this->states[i], 4);
+            this->setRobotColor(this->states[i], -1);
             ROS_INFO_THROTTLE(1, "\33[91mRobots has stopped!\33[0m");
         }
     }

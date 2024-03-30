@@ -9,7 +9,7 @@ safezone: 0.15
 # Control time interval (seconds)
 dt: 0.5
 # Mass of the robot
-mass: 10000
+mass: 8000
 # Max velocity of the robot (m/s)
 vmax: 0.06
 
