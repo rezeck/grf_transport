@@ -1,6 +1,6 @@
 version: "3.9"
 services:
-  ros1:
+  grf_transport_demo:
     image: grf_swarm_tranport:v1.0
     container_name: grf-swarm-tranport
     build:
@@ -13,13 +13,13 @@ services:
       - HERO_SIM=1
     ipc: none
     volumes:
-    - $HOME/.Xauthority:/root/.Xauthority:rw
-    - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    privileged: true # required for gazebo/rviz
+      - $HOME/.Xauthority:/root/.Xauthority:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - $PWD:/catkin_ws/src/grf_transport/:rw
+    privileged: true # Required for gazebo/rviz
     runtime: nvidia
     devices:
       - /dev/nvidia0:/dev/nvidia0
       - /dev/nvidiactl:/dev/nvidiactl
       - /dev/nvidia-uvm:/dev/nvidia-uvm
-    command: /bin/bash -c '. /opt/ros/noetic/setup.bash && . /catkin_ws/devel/setup.bash && roslaunch hero_bringup hero_confmode.launch' #hero_bringup.launch'
-    
+    command: /bin/bash -c '. /opt/ros/noetic/setup.bash && . /catkin_ws/devel/setup.bash && roslaunch grf_transport demo.launch'
