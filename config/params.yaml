@@ -17,16 +17,16 @@ vmax: 0.06
 worldsize: 4.00 #3.85
 
 # Visual debug RViz
-pub_object_state_rviz: True
+pub_object_state_rviz: False
 pub_object_state_topic: "/object_state"
 
-pub_gradient_object_rviz: True
+pub_gradient_object_rviz: False
 pub_gradient_object_topic: "/show_gradient_object_rviz"
 
 pub_objects_markers_rviz: True
 pub_objects_markers_topic: "/show_objects_rviz"
 
-pub_obstacles_markers_rviz: False
+pub_obstacles_markers_rviz: True
 pub_obstacles_markers_topic: "/show_obstacles_rviz"
 
 pub_neighborns_markers_rviz: False
