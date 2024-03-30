@@ -62,7 +62,7 @@
 // #define OBJECT_POS_X 0.0
 // #define OBJECT_POS_Y 0.0
 
-// #define ROBOT_COLOR_STATE
+#define ROBOT_COLOR_STATE
 
 // #define EXPERIMENT_MODE
 // #define ENABLE_FAILURES

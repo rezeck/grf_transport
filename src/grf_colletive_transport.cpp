@@ -136,8 +136,8 @@ Controller::Controller(ros::NodeHandle *nodehandle) : nh_(*nodehandle)
             XmlRpc::XmlRpcValue line = environment_coordinates[i];
             if (line.size() == 4)
             {
-                Vector2 start(double(line[0]) * this->scale_x, double(line[1]) * this->scale_y);
-                Vector2 end(double(line[2]) * this->scale_x, double(line[3]) * this->scale_y);
+                Vector2 start(double(line[0]) * this->worldsize, double(line[1]) * this->worldsize);
+                Vector2 end(double(line[2]) * this->worldsize, double(line[3]) * this->worldsize);
                 LineStruct line(start, end);
                 ROS_INFO("Setting obstacle lines: (%f, %f, %f, %f)", start.x, start.y, end.x, end.y);
                 obstacle_.local_lines.push_back(line);
@@ -518,9 +518,9 @@ double Controller::coulombBuckinghamPotential(double r, double eplson, double ep
     return eplson * ((6.0 / (alpha - 6.0)) * exp(alpha) * (1.0 - r / r0) - (alpha / (alpha - 6.0)) * std::pow(r0 / r, 6)) + (q1 * q2) / (4.0 * M_PI * eplson0 * r);
 }
 
-double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects1)
+double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects)
 {
-    if (this->object_shape.empty())
+    if (this->object_shape.empty() || (objects.size() < 2))
     {
         return 0.0;
     }
@@ -530,32 +530,23 @@ double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects1)
         m.type = visualization_msgs::Marker::ARROW;
         m.action = visualization_msgs::Marker::DELETEALL;
         this->pub_gradient_object.publish(m);
-        m.action = visualization_msgs::Marker::ADD;
-        m.header.stamp = ros::Time::now();
-        m.header.frame_id = "hero_" + boost::lexical_cast<std::string>((int)r_i.id) + "/odom";
-        m.color.r = 1.0;
-        m.color.g = 1.0;
-        m.color.b = 1.0;
-        m.color.a = 1.0;
     }
 
     // Simulated (kinematic model of the robot) the motion of the robot using the sampled velocity
-    // ROS_INFO("(%f, %f) -> (%f, %f)", r_i.position.x, r_i.position.y, r_i.position.x+v.x*this->dt, r_i.position.y+v.y*this->dt);
-    r_i.position.x = r_i.position.x + v.x * this->dt;
-    r_i.position.y = r_i.position.y + v.y * this->dt;
+    r_i.position.x += v.x * this->dt;
+    r_i.position.y += v.y * this->dt;
 
     // Get potential for the sampled velocity
     double Ut = 0.0f;
+    double object_mass = this->mass;
+
     // for each obstacles point in the world (same when using a laser)
-    std::vector<Vector2> objects = this->getObjectPoints(this->sensing, r_i);
     double factor = this->targetOcclusion(r_i, objects);
 
     bool use_cwise = this->goCWise(r_i, objects);
-    // ROS_INFO("Robot %f with charge %f", r_i.id, charge);
-    // ROS_INFO_THROTTLE(1, "Robot %f founded object points: %d", r_i.id, (int)objects.size());
+
     Vector2 object_contour_grad(0.0, 0.0);
-    double object_mass = 0.0;
-    for (int i = 0; i < objects.size(); i++)
+    for (int i = 0; i < (objects.size() - 1); i++)
     {
         double dist_i = this->euclidean(r_i.position, objects[i]);
         double dist_j = this->euclidean(r_i.position, objects[(i + 1) % objects.size()]);
@@ -563,15 +554,14 @@ double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects1)
         {
             continue;
         }
-        // Ut += this->coulombBuckinghamPotential(dist_i * 1.5, 0.04, 0.04, 0.8, 1.0, -32.0, 1.0);
         if (factor >= 5)
         {
-            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 0.6, -8000000.0, 1.0);
+            Ut += this->coulombBuckinghamPotential(dist_i, 0.04, 0.04, 0.8, 0.6, 8000000.0, -1.0);
             return Ut;
         }
         else
         {
-            Ut += this->coulombBuckinghamPotential(dist_i * factor, 0.04, 0.04, 0.8, 0.6, -50.0, 1.0);
+            Ut += this->coulombBuckinghamPotential(dist_i, 0.04, 0.04, 0.8, 0.6, 40000.0, -1.0);
         }
 
         if (dist_j >= this->sensing)
@@ -593,11 +583,19 @@ double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects1)
 
         object_contour_grad.x += (dV.x - v.x);
         object_contour_grad.y += (dV.y - v.y);
-        object_mass += 8.8 * this->mass;
+
+        object_mass += 100.0 * this->mass;
 
         if (this->pub_gradient_object_rviz)
         {
             visualization_msgs::Marker m;
+            m.action = visualization_msgs::Marker::ADD;
+            m.header.stamp = ros::Time::now();
+            m.header.frame_id = "hero_" + boost::lexical_cast<std::string>((int)r_i.id) + "/odom";
+            m.color.r = 0.0;
+            m.color.g = 0.0;
+            m.color.b = 1.0;
+            m.color.a = 1.0;
             double dist = this->euclidean(objects[i], objects[(i + 1) % objects.size()]);
             m.id = 1000 + i;
             m.pose.position.x = objects[i].x;
@@ -612,6 +610,10 @@ double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects1)
             m.scale.x = dist;
             m.scale.y = 0.008;
             m.scale.z = 0.008;
+            m.color.r = 0.0;
+            m.color.g = 0.0;
+            m.color.b = 1.0;
+            m.color.a = 1.0;
             this->pub_gradient_object.publish(m);
         }
     }
@@ -619,11 +621,8 @@ double Controller::fof_Ut(Robot r_i, Vector2 v, std::vector<Vector2> objects1)
     object_contour_grad = this->saturation(object_contour_grad, 1.0);
     double group_speed = (object_contour_grad.x * object_contour_grad.x + object_contour_grad.y * object_contour_grad.y) + 1.0e-9;
     double my_speed = (v.x * v.x + v.y * v.y);
-    // double group_speed = sqrt(group_vrel.x*group_vrel.x + group_vrel.y*group_vrel.y) + 1.0e-9;
-    // double my_speed = sqrt(v.x*v.x + v.y*v.y);
 
-    Ut += this->kineticEnergy(group_speed, object_mass) + this->kineticEnergy(object_mass, this->vmax - my_speed);
-    // ROS_INFO("[%f] Object interaction potencial of %f", r_i.id, Ut);
+    Ut += this->kineticEnergy(group_speed, object_mass) + this->kineticEnergy(this->vmax - my_speed, object_mass);
     return Ut;
 }
 
@@ -705,7 +704,7 @@ double Controller::fof_Ust(Robot r_i, Vector2 v, std::vector<Robot> states_t)
     // double group_speed = sqrt(group_vrel.x*group_vrel.x + group_vrel.y*group_vrel.y) + 1.0e-9;
     // double my_speed = sqrt(v.x*v.x + v.y*v.y);
 
-    Ust += this->kineticEnergy(group_speed, group_mass) + this->kineticEnergy(group_mass, this->vmax - my_speed);
+    Ust += this->kineticEnergy(group_speed, group_mass) + this->kineticEnergy(this->vmax - my_speed, group_mass);
     // Ust += this->kineticEnergy(group_speed, group_mass) - this->kineticEnergy(group_mass, my_speed);
     return Ust;
 }
@@ -914,7 +913,7 @@ std::vector<std::vector<Robot>> Controller::getAllRobotsNeighborns(std::vector<R
                 if (this->pub_neighborns_markers_rviz)
                 {
                     /* Insert robot i */
-                    m.header.frame_id = "hero_" + boost::lexical_cast<std::string>(i) + "/odom";
+                    m.header.frame_id = "world";
                     m.id = i * 1000 + j;
                     m.pose.position.x = agents[i].position.x;
                     m.pose.position.y = agents[i].position.y;
@@ -1072,9 +1071,9 @@ std::vector<Vector2> Controller::getObjectPoints(double sensing, Robot r)
         this->pub_objects_markers.publish(m);
         m.action = visualization_msgs::Marker::ADD;
         m.header.stamp = ros::Time::now();
-        m.header.frame_id = "hero_" + boost::lexical_cast<std::string>((int)r.id) + "/odom";
-        m.color.r = 0.6;
-        m.color.g = 0.6;
+        m.header.frame_id = "world";
+        m.color.r = 0.0;
+        m.color.g = 1.0;
         m.color.b = 0.0;
         m.color.a = 1.0;
         m.scale.x = 0.02;
@@ -1164,10 +1163,10 @@ std::vector<Vector2> Controller::getObstaclesPoints(double sensing, Robot r)
         this->pub_obstacles_markers.publish(m);
         m.points.clear();
         m.action = visualization_msgs::Marker::ADD;
-        m.header.frame_id = "hero_" + boost::lexical_cast<std::string>((int)r.id) + "/odom";
+        m.header.frame_id = "world";
         m.color.r = 1.0;
         m.color.g = 0.0;
-        m.color.b = 1.0;
+        m.color.b = 0.0;
         m.color.a = 1.0;
         m.scale.x = 0.02;
         m.scale.y = 0.02;
@@ -1260,7 +1259,7 @@ Vector2 Controller::metropolisHastings(Robot r_i, std::vector<Robot> states_t)
 
         // Compute the potential for the sampled velocity
         double U = this->fof_Us(r_i, sampled_vel, obstacles) +
-                      this->fof_Ut(r_i, sampled_vel, objects) +
+                   this->fof_Ut(r_i, sampled_vel, objects) +
                    this->fof_Ust(r_i, sampled_vel, states_t);
 
         // Accept the sampled velocity over the gibbs distribuition sampling
@@ -1343,7 +1342,7 @@ void Controller::update(long iterations)
 
         for (int i = 0; i < this->robots; ++i)
         {
-            m.header.frame_id = "hero_" + boost::lexical_cast<std::string>(i) + "/odom";
+            m.header.frame_id = "world";
             m.id = i;
             m.pose.position.x = this->global_poses[i].x;
             m.pose.position.y = this->global_poses[i].y;
@@ -1361,23 +1360,30 @@ void Controller::update(long iterations)
 
     for (int i = 0; i < this->robots; ++i)
     {
-#ifdef ROBOT_COLOR_STATE
-        std::vector<Vector2> objects = this->getObjectPoints(this->sensing, this->states[i]);
-        int state_color = 0;
-        for (uint8_t k = 0; k < objects.size(); k++)
+
+        if (!this->object_shape.empty())
         {
-            double mdist = this->euclidean(objects[k], this->states[i].position);
-            if ((state_color == 0) && (mdist < this->sensing))
+            std::vector<Vector2> objects = this->getObjectPoints(this->sensing, this->states[i]);
+            int state_color = 0;
+            for (uint8_t k = 0; k < objects.size(); k++)
             {
-                state_color = 1;
+                double mdist = this->euclidean(objects[k], this->states[i].position);
+                if ((state_color == 0) && (mdist < this->sensing))
+                {
+                    state_color = 1;
+                }
+                if ((state_color == 1) && (mdist < 0.06))
+                {
+                    state_color = 2;
+                    break;
+                }
             }
-            if ((state_color == 1) && (mdist < 0.06))
-            {
-                state_color = 2;
-                break;
-            }
+            this->setRobotColor(this->states[i], (int)state_color);
         }
-#endif
+        else
+        {
+            this->setRobotColor(this->states[i], (int)this->states[i].type);
+        }
 
 #ifdef ENABLE_FAILURES
         double failure_prob = ((double)rand() / ((double)(RAND_MAX) + (double)(1)));
@@ -1396,15 +1402,6 @@ void Controller::update(long iterations)
         }
 #endif
 
-#ifdef ROBOT_COLOR_STATE
-        if (this->states[i].state != state_color)
-        {
-            this->states[i].state == state_color;
-            this->setRobotColor(this->states[i], state_color);
-        }
-#else
-        this->setRobotColor(this->states[i], (int)this->states[i].type);
-#endif
         // Holonomic to differential driver controller
         geometry_msgs::Twist v;
 
@@ -1448,7 +1445,7 @@ void Controller::update(long iterations)
             ROS_INFO_THROTTLE(1, "\33[91mRobots has stopped!\33[0m");
         }
     }
-    this->logfile << ros::Time::now().toSec() << ", " << iterations << ", " << consensusVelocity() << ", " << clusterNumber(this->states) << std::endl;
+    // this->logfile << ros::Time::now().toSec() << ", " << iterations << ", " << consensusVelocity() << ", " << clusterNumber(this->states) << std::endl;
     // if (iterations > 2000){
     //     this->states[0].is_dead = true;
     // } else{
@@ -1552,7 +1549,7 @@ int main(int argc, char **argv)
     uint64_t trial = 0;
     std::string filename = "consensus_data" + std::to_string(trial);
     control.logfile = std::ofstream(filename + ".txt", std::ios::app); // Open file in append mode
-    control.resetSimulation();
+    // control.resetSimulation();
 
     ros::Rate rate(10);
     uint64_t iterations = 0;
