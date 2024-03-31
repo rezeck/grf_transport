@@ -114,8 +114,24 @@ apt-get install -y \
 ```
 
 
-<h3 align="left">Execution</h3>
+<h3 align="left">Demo</h3>
 
+- Build docker image:
+
+```sh
+docker compose build
+```
+
+- Run script:
+```sh
+sh docker-launch.sh
+```
+
+<p align="center">
+<img src="https://github.com/rezeck/grf_transport/assets/14208261/8bd9de16-6c77-4ee8-a4de-1bb74d4b05e3" width="600"></p>
+
+
+<h3 align="left">Execution</h3>
 - First, start Gazebo simulator:
 ```sh
 roslaunch hero_gazebo gazebo_bringup.launch
