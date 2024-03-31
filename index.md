@@ -117,7 +117,6 @@ apt-get install -y \
 <h3 align="left">Demo</h3>
 
 - Build docker image:
-
 ```sh
 docker compose build
 ```
