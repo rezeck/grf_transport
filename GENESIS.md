@@ -10,4 +10,4 @@ python3.12 -m venv .venv-genesis
 .venv-genesis/bin/python genesis/run_demo.py --headless
 ```
 
-Sem `--headless` abre o viewer (Metal neste Mac). A caixa cai, assenta, e os robôs empurram na direção +Y.
+Sem `--headless` abre o viewer. A colisão é a malha da arena (piso em z = 0,03 m). Os robôs contornam a caixa e empurram devagar até o alvo.
