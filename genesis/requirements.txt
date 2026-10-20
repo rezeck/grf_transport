@@ -1,2 +1,2 @@
-torch
-genesis-world
+torch==2.14.1
+genesis-world==1.4.3

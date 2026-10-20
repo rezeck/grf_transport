@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Transporte da caixa no Genesis, sem ROS e sem Gazebo.
 
-Os HeRo contornam a caixa e empurram devagar até o alvo (o outro lado da
-arena). Torque, atrito e o contato seguem o URDF: a caixa desliza e não
-decola quando encosta na parede.
+Cada HeRo roda o controlador GRF de src/grf_colletive_transport.cpp (ver
+grf.py): sente só o que o laser de 0,5 m alcança e amostra a velocidade por
+Metropolis-Hastings. Torque, atrito e contato seguem o URDF.
 """
 
 from __future__ import annotations
@@ -12,11 +12,15 @@ import argparse
 import math
 import os
 import re
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import grf  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 HERO_COMMON = Path(
@@ -51,14 +55,23 @@ GOAL = np.array([TARGET_POS[0], TARGET_POS[1]])
 BOX_SIZE = 0.4
 BOX_MASS = 0.3
 BOX_INERTIA = BOX_MASS * (BOX_SIZE**2 + BOX_SIZE**2) / 12.0
-BOX_HALF = BOX_SIZE / 2.0
 
 WHEEL_RADIUS = 0.025
+WHEEL_ARMATURE = 1e-5
 WHEEL_TRACK = 0.0646
-# v_max da UI do HeRo. Torque abaixo do effort 0.1 N·m do URDF.
-V_MAX = 0.05
-W_MAX = 0.40
+# Torque abaixo do effort 0.1 N·m do URDF.
 WHEEL_TORQUE = 0.05
+
+BOX_FRICTION = 0.35
+ARENA_FRICTION = 0.9
+BASE_FRICTION = 0.02
+WHEEL_FRICTION = 1.0
+
+# Igual ao C++: o controlador para quando a caixa chega a 0,1 m do alvo.
+ARRIVE_TOL = 0.10
+# O C++ roda a 10 Hz; o passo do Genesis é 0,01 s.
+CONTROL_EVERY = 10
+VIEWER_HOLD_STEPS = 3000
 
 
 def rewrite_packages(text: str, src: Path) -> str:
@@ -137,91 +150,18 @@ def wheel_speed(linear: float, angular: float) -> np.ndarray:
     )
 
 
-def push_slots(box_xy: np.ndarray, direction: np.ndarray) -> list[np.ndarray]:
-    lateral = np.array([-direction[1], direction[0]])
-    slots = []
-    # A primeira fila mira um pouco dentro da face, senão para antes de encostar.
-    for depth in (BOX_HALF, BOX_HALF + 0.09):
-        for offset in (-0.16, -0.08, 0.0, 0.08, 0.16):
-            slots.append(box_xy - direction * depth + lateral * offset)
-    return slots
-
-
-def assign_slots(positions: list[np.ndarray], slots: list[np.ndarray]) -> list[int]:
-    remaining = set(range(len(slots)))
-    chosen = []
-    for pos in positions:
-        slot = min(remaining, key=lambda i: float(np.linalg.norm(slots[i] - pos)))
-        remaining.remove(slot)
-        chosen.append(slot)
-    return chosen
-
-
-def lane_offsets(positions: list[np.ndarray], sides: list[float]) -> list[float]:
-    """Cada robô fica numa faixa fora da caixa, para não empilharem no mesmo ponto."""
-    offsets = [0.0] * len(positions)
-    for side in (-1.0, 1.0):
-        group = [i for i, value in enumerate(sides) if value == side]
-        group.sort(key=lambda i: positions[i][0])
-        for rank, index in enumerate(group):
-            offsets[index] = side * (BOX_HALF + 0.12 + rank * 0.09)
-    return offsets
-
-
-def approach_target(
-    robot_xy: np.ndarray,
-    slot: np.ndarray,
-    box_xy: np.ndarray,
-    direction: np.ndarray,
-    lane: float,
-    phase: int,
-) -> tuple[np.ndarray, int]:
-    """Sai para a faixa, passa por trás da caixa e só então encosta para empurrar."""
-    lateral = np.array([-direction[1], direction[0]])
-    along = float(np.dot(robot_xy - box_xy, direction))
-    rear = -(BOX_HALF + 0.1)
-    if phase == 0:
-        target = box_xy + lateral * lane + direction * along
-        if abs(float(np.dot(robot_xy - box_xy, lateral)) - lane) < 0.05:
-            phase = 1
-    if phase == 1:
-        target = box_xy + lateral * lane + direction * rear
-        if along < rear + 0.06:
-            phase = 2
-    if phase == 2:
-        target = slot
-    return target, phase
-
-
-def command_drive(robot, dofs, target_xy: np.ndarray, creep: float) -> None:
-    pos = as_vec(robot.get_pos(), 3)[:2]
-    error = target_xy - pos
-    distance = float(np.linalg.norm(error))
-    if distance < 0.03:
+def command_drive(robot, dofs, velocity: np.ndarray) -> None:
+    """Holonômico para diferencial, como no C++: v = |u|, w = 2 * erro de rumo."""
+    speed = min(float(np.linalg.norm(velocity)), grf.VMAX)
+    if speed < 1e-6:
         robot.control_dofs_velocity(np.zeros(2), dofs)
         return
-    yaw_error = wrap(math.atan2(error[1], error[0]) - yaw_of(robot))
-    # Continua andando na curva. Parar para girar deixa o grupo travado.
-    align = max(0.4, math.cos(min(abs(yaw_error), math.pi / 2)))
-    linear = min(creep, 0.8 * distance) * align
-    angular = float(np.clip(2.2 * yaw_error, -W_MAX, W_MAX))
-    robot.control_dofs_velocity(wheel_speed(linear, angular), dofs)
+    err = wrap(math.atan2(velocity[1], velocity[0]) - yaw_of(robot))
+    robot.control_dofs_velocity(wheel_speed(speed, 2.0 * err), dofs)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--headless", action="store_true")
-    parser.add_argument("--steps-settle", type=int, default=200)
-    parser.add_argument("--steps", type=int, default=20000)
-    args = parser.parse_args()
-
-    if not (HERO_COMMON / "hero_description").is_dir():
-        raise SystemExit(f"hero_common não encontrado em {HERO_COMMON}")
-
+def build_scene(show_viewer: bool, tmp_path: Path):
     import genesis as gs
-
-    # O cone elíptico no Metal fica lento demais para esta cena.
-    gs.init(backend=gs.cpu, logging_level="warning")
 
     scene = gs.Scene(
         sim_options=gs.options.SimOptions(dt=0.01, gravity=(0.0, 0.0, -9.81)),
@@ -241,163 +181,164 @@ def main() -> None:
             camera_lookat=(0.0, 0.0, 0.1),
             camera_fov=40,
         ),
-        show_viewer=not args.headless,
+        show_viewer=show_viewer,
     )
 
-    with tempfile.TemporaryDirectory(prefix="grf-genesis-") as tmp:
-        tmp_path = Path(tmp)
-        hero_urdf = prepare_hero(
-            HERO_COMMON / "hero_description" / "robot" / "hero_light.urdf",
-            tmp_path / "hero.urdf",
+    hero_urdf = prepare_hero(
+        HERO_COMMON / "hero_description" / "robot" / "hero_light.urdf",
+        tmp_path / "hero.urdf",
+    )
+    box_urdf = prepare_box(
+        REPO / "models" / "rectangular_prism" / "rectangular_prism.urdf",
+        tmp_path / "box.urdf",
+    )
+    target_urdf = prepare_visual(
+        REPO / "models" / "rectangular_prism" / "rectangular_prism_target.urdf",
+        tmp_path / "target.urdf",
+    )
+    arena_urdf = prepare_visual(
+        HERO_COMMON / "hero_gazebo" / "worlds" / "models" / "arena_0" / "arena.urdf",
+        tmp_path / "arena.urdf",
+    )
+    # Piso da malha em z=0.03. Um plano em z=0 deixa o robô dentro da laje.
+    arena = scene.add_entity(
+        gs.morphs.URDF(
+            file=str(arena_urdf),
+            fixed=True,
+            collision=True,
+            convexify=False,
+            decimate=False,
         )
-        box_urdf = prepare_box(
-            REPO / "models" / "rectangular_prism" / "rectangular_prism.urdf",
-            tmp_path / "box.urdf",
+    )
+    box = scene.add_entity(
+        gs.morphs.URDF(file=str(box_urdf), pos=BOX_POS, fixed=False, convexify=False)
+    )
+    scene.add_entity(
+        gs.morphs.URDF(
+            file=str(target_urdf), pos=TARGET_POS, fixed=True, collision=False
         )
-        target_urdf = prepare_visual(
-            REPO / "models" / "rectangular_prism" / "rectangular_prism_target.urdf",
-            tmp_path / "target.urdf",
-        )
-        arena_urdf = prepare_visual(
-            HERO_COMMON / "hero_gazebo" / "worlds" / "models" / "arena_0" / "arena.urdf",
-            tmp_path / "arena.urdf",
-        )
-        # Piso da malha em z=0.03. Um plano em z=0 deixa o robô dentro da laje.
-        arena = scene.add_entity(
-            gs.morphs.URDF(
-                file=str(arena_urdf),
-                fixed=True,
-                collision=True,
-                convexify=False,
-                decimate=False,
-            )
-        )
-        box = scene.add_entity(
-            gs.morphs.URDF(file=str(box_urdf), pos=BOX_POS, fixed=False, convexify=False)
-        )
+    )
+    robots = [
         scene.add_entity(
-            gs.morphs.URDF(
-                file=str(target_urdf),
-                pos=TARGET_POS,
-                fixed=True,
-                collision=False,
+            gs.morphs.URDF(file=str(hero_urdf), pos=pos, fixed=False, convexify=False)
+        )
+        for _name, pos in ROBOTS
+    ]
+    scene.build()
+    return scene, arena, box, robots
+
+
+def configure_contacts(arena, box, robots) -> list[list[int]]:
+    """Atrito e motores das rodas. Devolve os índices dos dois dofs de cada robô."""
+    box.get_link("object_link").set_friction(BOX_FRICTION)
+    arena.get_link("arena_link").set_friction(ARENA_FRICTION)
+    torque = np.full(2, WHEEL_TORQUE)
+    wheel_idx = []
+    for robot in robots:
+        robot.get_link("base_link").set_friction(BASE_FRICTION)
+        robot.get_link("left_wheel_link").set_friction(WHEEL_FRICTION)
+        robot.get_link("right_wheel_link").set_friction(WHEEL_FRICTION)
+        dofs = [
+            robot.get_joint("left_wheel_joint").dofs_idx_local[0],
+            robot.get_joint("right_wheel_joint").dofs_idx_local[0],
+        ]
+        wheel_idx.append(dofs)
+        # O Genesis põe armature 0,1 em toda junta, o que deixa a roda ~10^4
+        # vezes mais pesada que a do HeRo (3e-6 kg·m²) e o robô não acelera.
+        robot.set_dofs_armature(np.full(2, WHEEL_ARMATURE), dofs)
+        robot.set_dofs_kp(np.full(2, 4.0), dofs)
+        robot.set_dofs_kv(np.full(2, 0.08), dofs)
+        robot.set_dofs_force_range(-torque, torque, dofs)
+        robot.control_dofs_velocity(np.zeros(2), dofs)
+    return wheel_idx
+
+
+def run_transport(scene, box, robots, wheel_idx, steps_settle: int, steps: int) -> bool:
+    """Roda o GRF até a caixa chegar a ARRIVE_TOL do alvo. True se chegou."""
+    zero = np.zeros(2)
+    for _ in range(steps_settle):
+        scene.step()
+
+    controller = grf.GRFController(GOAL)
+    agents = [
+        grf.Agent(as_vec(robot.get_pos(), 3)[:2], yaw_of(robot)) for robot in robots
+    ]
+    settled = as_vec(box.get_pos(), 3)
+    print(f"caixa após assentar: x={settled[0]:.3f} y={settled[1]:.3f} z={settled[2]:.3f}")
+    robot_z = [float(as_vec(robot.get_pos(), 3)[2]) for robot in robots]
+    print(f"robôs no piso: z={min(robot_z):.3f}..{max(robot_z):.3f}")
+    max_box_z = float(settled[2])
+    min_robot_z, max_robot_z = min(robot_z), max(robot_z)
+
+    arrived = False
+    for step in range(steps):
+        box_xyz = as_vec(box.get_pos(), 3)
+        max_box_z = max(max_box_z, float(box_xyz[2]))
+        distance = float(np.linalg.norm(GOAL - box_xyz[:2]))
+        if distance < ARRIVE_TOL:
+            arrived = True
+            break
+        for robot in robots:
+            z = float(as_vec(robot.get_pos(), 3)[2])
+            min_robot_z, max_robot_z = min(min_robot_z, z), max(max_robot_z, z)
+        if step % CONTROL_EVERY == 0:
+            for agent, robot in zip(agents, robots):
+                agent.position = as_vec(robot.get_pos(), 3)[:2]
+                agent.theta = yaw_of(robot)
+            velocities = controller.step(agents, box_xyz[:2], yaw_of(box))
+            for robot, dofs, velocity in zip(robots, wheel_idx, velocities):
+                command_drive(robot, dofs, velocity)
+        scene.step()
+        if step % 1000 == 999:
+            print(
+                f"t={0.01 * (step + 1):.0f}s caixa x={box_xyz[0]:.3f} "
+                f"y={box_xyz[1]:.3f} z={box_xyz[2]:.3f} alvo={distance:.3f} m"
             )
-        )
-        robots = []
-        for name, pos in ROBOTS:
-            robot = scene.add_entity(
-                gs.morphs.URDF(
-                    file=str(hero_urdf),
-                    pos=pos,
-                    fixed=False,
-                    convexify=False,
-                )
-            )
-            robots.append((name, robot))
 
-        scene.build()
+    for robot, dofs in zip(robots, wheel_idx):
+        robot.control_dofs_velocity(zero, dofs)
+    final = as_vec(box.get_pos(), 3)
+    end_goal = float(np.linalg.norm(final[:2] - GOAL))
+    print(
+        f"caixa no fim: x={final[0]:.3f} y={final[1]:.3f} z={final[2]:.3f} "
+        f"alvo={end_goal:.3f} m"
+    )
+    print(f"z caixa={max_box_z:.3f} robô={min_robot_z:.3f}..{max_robot_z:.3f}")
+    if min_robot_z < 0.03:
+        raise SystemExit("Os robôs atravessaram o piso da arena.")
+    if max_box_z > settled[2] + 0.05:
+        raise SystemExit("A caixa levantou.")
+    if max_robot_z > 0.12:
+        raise SystemExit("Os robôs saltaram.")
+    if not arrived:
+        print(f"caixa não chegou: faltam {end_goal:.3f} m (tolerância {ARRIVE_TOL} m)")
+    return arrived
 
-        box.get_link("object_link").set_friction(0.35)
-        arena.get_link("arena_link").set_friction(0.9)
-        wheel_idx = []
-        zero = np.zeros(2)
-        torque = np.full(2, WHEEL_TORQUE)
-        for _name, robot in robots:
-            robot.get_link("base_link").set_friction(0.02)
-            robot.get_link("left_wheel_link").set_friction(1.0)
-            robot.get_link("right_wheel_link").set_friction(1.0)
-            dofs = [
-                robot.get_joint("left_wheel_joint").dofs_idx_local[0],
-                robot.get_joint("right_wheel_joint").dofs_idx_local[0],
-            ]
-            wheel_idx.append(dofs)
-            robot.set_dofs_kp(np.full(2, 4.0), dofs)
-            robot.set_dofs_kv(np.full(2, 0.08), dofs)
-            robot.set_dofs_force_range(-torque, torque, dofs)
-            robot.control_dofs_velocity(zero, dofs)
 
-        for _ in range(args.steps_settle):
-            scene.step()
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--headless", action="store_true")
+    parser.add_argument("--steps-settle", type=int, default=200)
+    parser.add_argument("--steps", type=int, default=30000)
+    args = parser.parse_args()
 
-        settled = as_vec(box.get_pos(), 3)
-        positions = [as_vec(robot.get_pos(), 3)[:2] for _name, robot in robots]
-        to_goal = GOAL - settled[:2]
-        direction = to_goal / max(float(np.linalg.norm(to_goal)), 1e-6)
-        slot_of = assign_slots(positions, push_slots(settled[:2], direction))
-        sides = [1.0 if pos[0] >= settled[0] else -1.0 for pos in positions]
-        lanes = lane_offsets(positions, sides)
-        phases = [0] * len(robots)
-        start_goal = float(np.linalg.norm(to_goal))
-        print(
-            f"caixa após assentar: x={settled[0]:.3f} y={settled[1]:.3f} z={settled[2]:.3f}"
-        )
+    if not (HERO_COMMON / "hero_description").is_dir():
+        raise SystemExit(f"hero_common não encontrado em {HERO_COMMON}")
 
-        robot_z = [float(as_vec(robot.get_pos(), 3)[2]) for _n, robot in robots]
-        print(f"robôs no piso: z={min(robot_z):.3f}..{max(robot_z):.3f}")
-        max_box_z = float(settled[2])
-        max_robot_z = max(robot_z)
-        min_robot_z = min(robot_z)
-        arrived = False
-        final = settled
-        for step in range(args.steps):
-            box_xyz = as_vec(box.get_pos(), 3)
-            max_box_z = max(max_box_z, float(box_xyz[2]))
-            to_goal = GOAL - box_xyz[:2]
-            distance = float(np.linalg.norm(to_goal))
-            if distance < 0.35:
-                arrived = True
-                for (_name, robot), dofs in zip(robots, wheel_idx):
-                    robot.control_dofs_velocity(zero, dofs)
-            else:
-                direction = to_goal / distance
-                slots = push_slots(box_xyz[:2], direction)
-                # Perto do alvo, anda mais devagar para não lançar a caixa.
-                creep = 0.04 + 0.02 * min(distance / 1.5, 1.0)
-                for i, ((_name, robot), dofs) in enumerate(zip(robots, wheel_idx)):
-                    robot_xyz = as_vec(robot.get_pos(), 3)
-                    max_robot_z = max(max_robot_z, float(robot_xyz[2]))
-                    min_robot_z = min(min_robot_z, float(robot_xyz[2]))
-                    target, phases[i] = approach_target(
-                        robot_xyz[:2],
-                        slots[slot_of[i]],
-                        box_xyz[:2],
-                        direction,
-                        lanes[i],
-                        phases[i],
-                    )
-                    command_drive(robot, dofs, target, creep)
-            scene.step()
-            if step % 1000 == 999:
-                print(
-                    f"t={0.01 * (step + 1):.0f}s caixa x={box_xyz[0]:.3f} "
-                    f"y={box_xyz[1]:.3f} z={box_xyz[2]:.3f}"
-                )
-            if arrived:
-                final = as_vec(box.get_pos(), 3)
-                break
-        else:
-            final = as_vec(box.get_pos(), 3)
+    import genesis as gs
 
-        end_goal = float(np.linalg.norm(final[:2] - GOAL))
-        print(
-            f"caixa no fim: x={final[0]:.3f} y={final[1]:.3f} z={final[2]:.3f} "
-            f"alvo={end_goal:.3f} m"
-        )
-        print(
-            f"z caixa={max_box_z:.3f} robô={min_robot_z:.3f}..{max_robot_z:.3f}"
-        )
-        if min_robot_z < 0.03:
-            raise SystemExit("Os robôs atravessaram o piso da arena.")
-        if max_box_z > settled[2] + 0.05:
-            raise SystemExit("A caixa levantou.")
-        if max_robot_z > 0.12:
-            raise SystemExit("Os robôs saltaram.")
-        if end_goal > start_goal - 0.8:
-            raise SystemExit("A caixa não foi para o outro lado.")
-        print("transporte ok" if arrived else "caixa a caminho do alvo")
+    # O cone elíptico no Metal fica lento demais para esta cena.
+    gs.init(backend=gs.cpu, logging_level="warning")
+
+    with tempfile.TemporaryDirectory(prefix="grf-genesis-") as tmp:
+        scene, arena, box, robots = build_scene(not args.headless, Path(tmp))
+        wheel_idx = configure_contacts(arena, box, robots)
+        arrived = run_transport(scene, box, robots, wheel_idx, args.steps_settle, args.steps)
+        print("transporte ok" if arrived else "transporte incompleto")
         if not args.headless:
-            for _ in range(300):
+            for _ in range(VIEWER_HOLD_STEPS):
                 scene.step()
+    raise SystemExit(0 if arrived else 1)
 
 
 if __name__ == "__main__":

@@ -10,4 +10,4 @@ python3.12 -m venv .venv-genesis
 .venv-genesis/bin/python genesis/run_demo.py --headless
 ```
 
-Sem `--headless` abre o viewer. A colisão é a malha da arena (piso em z = 0,03 m). Os robôs contornam a caixa e empurram devagar até o alvo.
+Sem `--headless` abre o viewer. A colisão é a malha da arena (piso em z = 0,03 m). O controle é o GRF do C++ (`genesis/grf.py`, portado de `src/grf_colletive_transport.cpp`): laser de 0,5 m, Metropolis-Hastings e sem comunicação. Sem alvo à vista o enxame vagueia até achar a caixa (~5 min simulados) e a empurra até o alvo.
